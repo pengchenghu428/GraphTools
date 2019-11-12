@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 '''=================================================
-@Project -> File   ：GraphTools -> graphnn -> graph_attention_network
+@Project -> File   ：GraphTools -> layers -> graphnn -> graph_attention_network
 @IDE    ：PyCharm
 @Author ：pengchenghu
 @Date   ：2019/11/11 20:06
-@Desc   ：
+@Desc   ：Keras 实现注意力机制图卷积
 =================================================='''
 
 from keras import activations, constraints, initializers, regularizers
@@ -132,7 +132,7 @@ class GraphAttention(Layer):
             dense = attn_for_self + K.transpose(attn_for_neighs)
 
             # 添加非线性变换
-            dense= LeakyReLU(alpha=0.2)(dense)
+            dense = LeakyReLU(alpha=0.2)(dense)
 
             # 激活前的掩码值
             mask = -10e9 * (1.0 - A)

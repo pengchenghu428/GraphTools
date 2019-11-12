@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 '''=================================================
-@Project -> File   ：GraphTools -> graphnn -> graph_convolution_network
+@Project -> File   ：GraphTools -> layers -> graphnn -> graph_convolution_network
 @IDE    ：PyCharm
 @Author ：pengchenghu
 @Date   ：2019/11/11 20:06
-@Desc   ：kreas 实现Graph Convolution Network
+@Desc   ：keras 实现Graph Convolution Network
 =================================================='''
 
 from keras import activations, initializers, constraints
@@ -32,7 +32,7 @@ class GraphConvolution(Layer):
         super(GraphConvolution, self).__init__(**kwargs)
 
         self.units = units  # 神经元个数
-        self.activation = activation  # 激活函数
+        self.activation = activations.get(activation)  # 激活函数
         self.use_bias = use_bias  # 是否使用偏置项
         self.kernel_initializer = initializers.get(kernel_initializer)  # 权值初始化方法
         self.bias_initializer = initializers.get(bias_initializer)  # 偏置初始化方法
