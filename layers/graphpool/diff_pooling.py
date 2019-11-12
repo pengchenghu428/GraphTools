@@ -5,7 +5,7 @@
 @IDE    ：PyCharm
 @Author ：pengchenghu
 @Date   ：2019/11/11 20:06
-@Desc   ：keras  实现Differentiable Pooling
+@Desc   ：keras  实现Differentiable Pooling 2019
 =================================================='''
 
 from keras import activations, initializers, constraints

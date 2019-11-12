@@ -5,7 +5,7 @@
 @IDE    ：PyCharm
 @Author ：pengchenghu
 @Date   ：2019/11/11 20:06
-@Desc   ：keras 实现Self-Attention Graph Pooling
+@Desc   ：keras 实现Self-Attention Graph Pooling  2019
 =================================================='''
 
 from keras import activations, initializers, constraints
@@ -55,6 +55,8 @@ class SAGraphPooling(Layer):
             self.attn_kernels.append((attn_kernel_self))
 
         self.origin_nodes = X_shape[0]
+        self.keep_nodes = max(int(self.rate * self.origin_nodes), 1)  # 保存节点的数目
+        self.features_dim = X_shape[-1]
         self.build = True  # 必须将 self.built 设置为True, 以保证该 Layer 已经成功 build
 
     # 用来执行 Layer 的职能, 即当前 Layer 所有的计算过程均在该函数中完成
@@ -78,17 +80,20 @@ class SAGraphPooling(Layer):
         else:
             scoring = K.mean(K.stack(scores), axis=0)  # (N x 1)
 
-        keep_nodes = max(int(self.rate*self.origin_nodes), 1)  # 保存节点的数目
-
         # 按照输入的最后一个维度排序，选取top keep_nodes的值
-        keep_indices = scoring
-        X_out = K.gather(X, keep_indices)
+        keep_values = tf.nn.top_k(scoring, k=self.keep_nodes).values
+        keep_indices = tf.nn.top_k(scoring, k=self.keep_nodes).indices
+        X_out = K.gather(X, keep_indices)  # 行选择
+        X_out = K.gather(X_out, keep_indices, axis=1)  # 列选择
         A_out = A[keep_indices, keep_indices]
-        return X_out, A_out
+        return X_out, A_out, keep_values
 
     # 计算输出shape
     def compute_output_shape(self, input_shape):
-
-        return None
+        X_shape = (self.keep_nodes, self.features_dim)
+        A_shape = (self.keep_nodes, self.keep_nodes)
+        scoring_shape = (self.keep_nodes,)
+        output_shape = (X_shape, A_shape, scoring_shape)
+        return output_shape
 
 

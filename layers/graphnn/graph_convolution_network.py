@@ -5,7 +5,7 @@
 @IDE    ：PyCharm
 @Author ：pengchenghu
 @Date   ：2019/11/11 20:06
-@Desc   ：keras 实现Graph Convolution Network
+@Desc   ：keras 实现Graph Convolution Network 2017
 =================================================='''
 
 from keras import activations, initializers, constraints

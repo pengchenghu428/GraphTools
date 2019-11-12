@@ -5,7 +5,7 @@
 @IDE    ：PyCharm
 @Author ：pengchenghu
 @Date   ：2019/11/11 20:06
-@Desc   ：Keras 实现SortPooling
+@Desc   ：Keras 实现SortPooling 2018
 =================================================='''
 
 from keras.engine import Layer

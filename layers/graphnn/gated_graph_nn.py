@@ -5,7 +5,7 @@
 @IDE    ：PyCharm
 @Author ：pengchenghu
 @Date   ：2019/11/11 20:06
-@Desc   ：Keras 实现门控图神经网络
+@Desc   ：Keras 实现门控图神经网络 2016
 =================================================='''
 
 from keras import activations, constraints, initializers, regularizers

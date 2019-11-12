@@ -5,7 +5,7 @@
 @IDE    ：PyCharm
 @Author ：pengchenghu
 @Date   ：2019/11/11 20:06
-@Desc   ：Keras 实现注意力机制图卷积
+@Desc   ：Keras 实现注意力机制图卷积 2018
 =================================================='''
 
 from keras import activations, constraints, initializers, regularizers
