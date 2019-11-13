@@ -86,14 +86,14 @@ class SAGraphPooling(Layer):
         X_out = K.gather(X, keep_indices)  # 行选择
         X_out = K.gather(X_out, keep_indices, axis=1)  # 列选择
         A_out = A[keep_indices, keep_indices]
-        return X_out, A_out, keep_values
+        return [X_out, A_out, keep_values]
 
     # 计算输出shape
     def compute_output_shape(self, input_shape):
         X_shape = (self.keep_nodes, self.features_dim)
         A_shape = (self.keep_nodes, self.keep_nodes)
         scoring_shape = (self.keep_nodes,)
-        output_shape = (X_shape, A_shape, scoring_shape)
+        output_shape = [X_shape, A_shape, scoring_shape]
         return output_shape
 
 

@@ -22,6 +22,8 @@ class GlobalMeanMaxPooling(Layer):
                  **kwargs):
         super(GlobalMeanMaxPooling).__init__(kwargs)
 
+        self.type = type
+
     def build(self, input_shape):
         # input = [X, scoring] or input = X
 

@@ -80,13 +80,13 @@ class DiffPooling(Layer):
         A_next_layer = K.dot(K.transpose(smatrix), basis)
         A_next_layer = K.dot(A_next_layer, smatrix)  # A_l+1 = (S_l)^T * A_l * S^T  (n_l+1, n_l+1)
 
-        return X_next_layer, A_next_layer, smatrix
+        return [X_next_layer, A_next_layer, smatrix]
 
     # 计算输出shape
     def compute_output_shape(self, input_shape):
         features_dims = input_shape[0][1]  # input = [X, A]
         n_nodes = input_shape[1][0]  # 节点数目
-        output_shape = ((self.units, features_dims),(self.units, self.units), (n_nodes, self.units))
+        output_shape = [(self.units, features_dims), (self.units, self.units), (n_nodes, self.units)]
         return output_shape
 
     # 输出当前网络配置
