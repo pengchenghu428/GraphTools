@@ -53,10 +53,9 @@ def load_data(path="data/", dataset="FRANKENSTEIN"):
         nodes_attrs = None
 
     # 切分多图
-    Xs, As = list()
+    Xs, As = list(), list()
     node_idx = np.arange(1, graph_idx.shape[0]+1)
     for gidx in np.unique(graph_idx):
-        graph = list()
         node = node_idx[graph_idx == gidx]  # 切分出节点编号
         node_length = node.shape[0]  # 节点数量
         mask = np.isin(edges, node).all(axis=1)  # 切分出对应的连接
@@ -68,7 +67,7 @@ def load_data(path="data/", dataset="FRANKENSTEIN"):
         Xs.append(X)
         As.append(A.astype('int'))
     y = np.where(graph_labels == -1, 1, 0)
-    return np.array(Xs), np.array(As), y
+    return Xs, As, y
 
 
 if __name__ == "__main__":

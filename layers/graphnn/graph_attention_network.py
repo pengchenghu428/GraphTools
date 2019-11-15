@@ -11,6 +11,7 @@
 from keras import activations, constraints, initializers, regularizers
 from keras import backend as K
 from keras.layers import Layer, Dropout, LeakyReLU
+import tensorflow as tf
 
 
 class GraphAttention(Layer):
@@ -111,22 +112,21 @@ class GraphAttention(Layer):
         self.built = True  # 必须将 self.built 设置为True, 以保证该 Layer 已经成功 build
 
     def call(self, inputs):
-        X = inputs[0]  # 节点特征 (N X F)
-        A = inputs[1]  # 邻接矩阵 (N X N)
+        Xs = inputs[0]  # 节点特征 (batch X N X F)
+        As = inputs[1]  # 邻接矩阵 (batch X N X N)
 
         outputs = []
-
         for head in range(self.attn_heads):
             kernel = self.kernels[head]  # W 维度 （F， units）
             attention_kernel = self.attn_kernels[head]  # 注意力核 维度（2*units, 1）
 
             # 计算注意力网络的输入
-            features = K.dot(X, kernel)  # X * W (N x units)
+            features = K.dot(Xs, kernel)  # Xs * W (batch X N x units)
 
             # 计算特征联合
             # [[a_1], [a_2]]^T [[Wh_i], [Wh_j]] = [a_1]^T [Wh_i] + [a_2]^T [Wh_j]
-            attn_for_self = K.dot(features, attention_kernel[0])  # (N x units), (units, 1) -> (N, 1)
-            attn_for_neighs = K.dot(features, attention_kernel[1])  # (N x units), (units, 1) -> (N, 1)
+            attn_for_self = K.dot(features, attention_kernel[0])  # (batch X N x units), (units, 1) -> (batch X N, 1)
+            attn_for_neighs = K.dot(features, attention_kernel[1])  # (batch X N x units), (units, 1) -> (batch X N, 1)
 
             # 注意力机制 a(Wh_i, Wh_j) = a^T [[Wh_i], [Wh_j]]
             dense = attn_for_self + K.transpose(attn_for_neighs)
@@ -135,37 +135,39 @@ class GraphAttention(Layer):
             dense = LeakyReLU(alpha=0.2)(dense)
 
             # 激活前的掩码值
-            mask = -10e9 * (1.0 - A)
-            dense += mask
+            mask = -10e9 * (1.0 - As)
+            # dense += mask  # bug
+            dense = K.bias_add(dense, mask)
 
             # softmax 获得注意力分数
             dense = K.softmax(dense)
 
             # 对特征和注意力分数应用dropout
-            dropout_attn = Dropout(self.dropout_rate)(dense)  # (N x N)
-            dropout_feat = Dropout(self.dropout_rate)(features)  # (N x units)
+            dropout_attn = Dropout(self.dropout_rate)(dense)  # (batch X N x N)
+            dropout_feat = Dropout(self.dropout_rate)(features)  # (batch X N x units)
 
             # 注意力权重组合特征值
-            node_features = K.dot(dropout_attn, dropout_feat)
+            # node_features = K.dot(dropout_attn, dropout_feat)
+            node_features = tf.matmul(dropout_attn, dropout_feat)
 
             if self.use_bias:
                 node_features = K.bias_add(node_features, self.biases[head])
 
             # 将输出添加到最终的输出
-            outputs.append((node_features))
+            outputs.append(node_features)
 
         # 根据不同的维度约见方法聚集各个注意力的输出
         if self.attn_heads_reduction == 'concat':
-            output = K.concatenate(outputs)  # (N x Kunits)
+            output = K.concatenate(outputs)  # (batch X N x Kunits)
         else:
-            output = K.mean(K.stack(outputs), axis=0)  # (N x F')
+            output = K.mean(K.stack(outputs), axis=0)  # (batch X N x F')
 
         output = self.activation(output)  # 激活函数
         return output
 
     # 计算输出维度
     def compute_output_shape(self, input_shape):
-        output_shape = input_shape[0][0], self.output_dim
+        output_shape = input_shape[0][0], input_shape[0][1], self.output_dim
         return output_shape
 
     # 输出当前网络配置

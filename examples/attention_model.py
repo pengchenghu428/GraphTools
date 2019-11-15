@@ -17,6 +17,11 @@ from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.optimizers import Adam
 from keras.regularizers import l2
 
+import warnings
+warnings.filterwarnings("ignore")
+
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
 dataset_path = 'data/'
 dataset_name = 'FRANKENSTEIN'
 model_save_path = 'output/models/'
@@ -28,12 +33,21 @@ dropout_rate = 0.6            # 丢失率
 l2_reg = 5e-4/2               # l2正则化因子
 learning_rate = 5e-3          # Adam 学习率
 epochs = 10000                # 迭代次数
-batch_size = 256              # batch 尺寸
+batch_size = 2              # batch 尺寸
 es_patience = 100             # 提前停止轮数
 
 
 def data_prepared(Xs, As):
-    print()
+    '''
+    数据准备
+    :param Xs:
+    :param As:
+    :return:
+    '''
+    # 统一尺寸
+    Xs, As = resized_graph(Xs, As)
+    As = np.array([add_self_adj(A) for A in As])
+    return Xs, As
 
 
 def create_attention_model(Xs, As):
@@ -48,12 +62,13 @@ def create_attention_model(Xs, As):
                                        kernel_regularizer=l2(l2_reg),
                                        attn_kernel_regularizer=l2(l2_reg)
                                        )([X_in, A_in])
-    sag_pooling_X_1, sag_pooling_A_1, sag_pooling_keep_values_1 = SAGraphPooling(rate=0.5,
-                                                                                 attn_heads=8,
-                                                                                 attn_heads_reduction='mean',
-                                                                                 activation='softmax',
-                                                                                 attn_initializer='glorot_uniform')([graph_attention_1, A_in])
-    read_out_1 = GlobalMeanMaxPooling(type='mean|max')([sag_pooling_X_1, sag_pooling_keep_values_1])
+    # sag_pooling_X_1, sag_pooling_A_1, sag_pooling_keep_values_1 = SAGraphPooling(rate=0.5,
+    #                                                                              attn_heads=n_attn_heads,
+    #                                                                              attn_heads_reduction='mean',
+    #                                                                              activation='softmax',
+    #                                                                              attn_initializer='glorot_uniform')([graph_attention_1, A_in])
+    # read_out_1 = GlobalMeanMaxPooling(type='mean|max')([sag_pooling_X_1, sag_pooling_keep_values_1])
+    read_out_1 = GlobalMeanMaxPooling(type='mean|max')([graph_attention_1])
 
     dense_1 = Dense(units=128, activation='relu')(read_out_1)
     dropout_1 = Dropout(rate=0.5)(dense_1)
@@ -63,7 +78,7 @@ def create_attention_model(Xs, As):
     model = Model(inputs=[X_in, A_in], outputs=output)
     optimizer = Adam(lr=learning_rate)
     model.compile(optimizer=optimizer,
-                  loss='categorical_crossentropy',
+                  loss='binary_crossentropy',
                   weighted_metrics=['acc'])
     return model
 
@@ -80,14 +95,14 @@ def train(Xs, As, y, path, name):
     '''
     print("Train attention examples")
 
-    model = create_attention_model()
+    model = create_attention_model(Xs, As)
 
     weight_path = "{}/{}/{}_model_weights.best.h5".format(dir, name, name)
     checkpoint = ModelCheckpoint(filepath=weight_path, monitor='val_acc', verbose=0,
                                 save_best_only=True, mode='max')
     early_stopping = EarlyStopping(monitor='val_acc', patience=es_patience)
     callback_list = [checkpoint, early_stopping]
-    history = model.fit([Xs_train] + [As_train], y_train,
+    history = model.fit([Xs] + [As], y,
               epochs=epochs, batch_size=batch_size, shuffle=True,
               validation_split=0.1, callbacks=callback_list, verbose=1)
     model = load_model(path, name)  # 加载最优模型
@@ -98,6 +113,7 @@ if __name__ == "__main__":
     # execute only if run as a script
     os.chdir('../')
     Xs, As, y = load_data(dataset_path, dataset_name)  # 从磁盘加载数据
+    Xs, As = data_prepared(Xs, As)
     Xs_train, As_train, y_train, Xs_test, As_test, y_test = split_data(Xs, As, y)  # 划分数据集
     train(Xs_train, As_train, y_train, model_save_path, model_name)
     model = load_model(model_save_path, model_name)  # 加载最优模型
