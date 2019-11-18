@@ -12,6 +12,7 @@ from keras import activations, initializers, constraints
 from keras import regularizers
 from keras.engine import Layer
 import keras.backend as K
+import tensorflow as tf
 
 
 class DiffPooling(Layer):
@@ -30,7 +31,7 @@ class DiffPooling(Layer):
                  **kwargs):
         super(DiffPooling, self).__init__(**kwargs)
 
-        self.units = units  # 神经元个数
+        self.units = units  # DiffPooling后的节点数目，神经元个数
         self.activation = activations.get(activation)  # 激活函数
         self.use_bias = use_bias  # 是否使用偏置项
         self.kernel_initializer = initializers.get(kernel_initializer)  # 权值初始化方法
@@ -48,7 +49,7 @@ class DiffPooling(Layer):
         input_dim = features_shape[1]  # 特征维度
 
         # 权重
-        self.kernel = self.add_weight(shape=(input_dim,self.units),
+        self.kernel = self.add_weight(shape=(input_dim, self.units),
                                       initializer=self.kernel_initializer,
                                       name='kernel',
                                       regularizer=self.kernel_regularizer,
@@ -67,26 +68,31 @@ class DiffPooling(Layer):
 
     # 用来执行 Layer 的职能, 即当前 Layer 所有的计算过程均在该函数中完成
     def call(self, inputs, mask=None):
-        features, basis = inputs[0], inputs[1]  # X, A
+        features, basis = inputs[0], inputs[1]  # X（None, n_l, f_l）, A(None, n_l, n_l)
 
-        support = K.dot(basis, features)  # A * X
-        smatrix = K.dot(support, self.kernel)  # A * X * W (n_l x n_l+1)
+        support = tf.matmul(basis, features)  # A * X (None, n_l, f_l)
+        smatrix = K.dot(support, self.kernel)  # A * X * W (None, n_l, n_l+1)
 
         if self.use_bias:  # 偏置
             smatrix += self.bias
 
-        smatrix = self.activation(smatrix)  # sigma(A * X * W) (n_l x n_l+1)
-        X_next_layer = K.dot(K.transpose(smatrix), features)  # X_l+1 = (S_l)^T * X_l  (n_l+1, X,shape[1])
-        A_next_layer = K.dot(K.transpose(smatrix), basis)
-        A_next_layer = K.dot(A_next_layer, smatrix)  # A_l+1 = (S_l)^T * A_l * S^T  (n_l+1, n_l+1)
+        smatrix = self.activation(smatrix)  # sigma(A * X * W) (None, n_l, n_l+1)
+        # X_l+1 = (S_l)^T * X_l  (None, n_l+1, x.shape[-1])
+        X_next_layer = tf.matmul(tf.transpose(smatrix, perm=[0, 2, 1]), features)
+        # A_l+1 = (S_l)^T * A_l * S_l  (None, n_l+1, n_l+1)
+        A_next_layer = tf.matmul(tf.transpose(smatrix, perm=[0, 2, 1]), basis)
+        A_next_layer = tf.matmul(A_next_layer, smatrix)
 
         return [X_next_layer, A_next_layer, smatrix]
 
     # 计算输出shape
     def compute_output_shape(self, input_shape):
+        batch_size = input_shape[0][0]  # input_shape:[(None, n_l, f_l), (None, n_l, n_l)]
         features_dims = input_shape[0][1]  # input = [X, A]
         n_nodes = input_shape[1][0]  # 节点数目
-        output_shape = [(self.units, features_dims), (self.units, self.units), (n_nodes, self.units)]
+        output_shape = [(batch_size, self.units, features_dims),
+                        (batch_size, self.units, self.units),
+                        (batch_size, n_nodes, self.units)]
         return output_shape
 
     # 输出当前网络配置

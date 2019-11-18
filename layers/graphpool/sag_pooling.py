@@ -43,7 +43,7 @@ class SAGraphPooling(Layer):
     # 初始化weight
     def build(self, input_shapes):
         assert len(input_shapes) >= 2  # 检查输入维度 input=[X, A]
-        X_shape, A_shape = input_shapes
+        X_shape, A_shape = input_shapes  # [(None, N, F), (None, N, N)]
 
         for head in range(self.attn_heads):
             # Attention kernels
@@ -54,15 +54,16 @@ class SAGraphPooling(Layer):
                                            name='attn_kernel_self_{}'.format(head), )  # (F, 1)
             self.attn_kernels.append((attn_kernel_self))
 
-        self.origin_nodes = X_shape[0]
+        self.batch_size = X_shape[0]
+        self.origin_nodes = X_shape[1]  # 原节点数目
         self.keep_nodes = max(int(self.rate * self.origin_nodes), 1)  # 保存节点的数目
         self.features_dim = X_shape[-1]
         self.build = True  # 必须将 self.built 设置为True, 以保证该 Layer 已经成功 build
 
     # 用来执行 Layer 的职能, 即当前 Layer 所有的计算过程均在该函数中完成
     def call(self, inputs, mask=None):
-        X = inputs[0]  # 节点特征 (N X F)
-        A = inputs[1]  # 邻接矩阵 (N X N)
+        Xs = inputs[0]  # 节点特征 (None, N, F)
+        As = inputs[1]  # 邻接矩阵 (None, N, N)
 
         scores = []
 
@@ -70,29 +71,48 @@ class SAGraphPooling(Layer):
             attention_kernel = self.attn_kernels[head]  # 注意力核 维度（F, 1）
 
             # 计算注意力网络的输入
-            support = K.dot(A, X)  # A * X
-            support = K.dot(support, attention_kernel)  # A * X * attn (NXN, NXF, FX1)->(N, 1)
-            score = self.activation(support)
+            support = tf.matmul(As, Xs)  # A * X (None, N, F)
+            support = tf.matmul(support, attention_kernel)  # A * X * attn (None, N, 1)
+            score = self.activation(support, axis=1)
+            # score = K.reshape(score, (self.batch_size, self.origin_nodes))  # 展成二维
             scores.append(score)
 
         if self.attn_heads_reduction == 'mean':
-            scoring = K.mean(K.stack(scores), axis=0)  # (N x 1)
-        else:
-            scoring = K.mean(K.stack(scores), axis=0)  # (N x 1)
+            scoring = K.mean(K.stack(scores), axis=0)  # (None, N, 1)
+        else:  # 可以由max/sum...
+            scoring = K.mean(K.stack(scores), axis=0)  # (None, N, 1)
+        scoring = K.reshape(scoring, (self.batch_size, self.origin_nodes))
 
         # 按照输入的最后一个维度排序，选取top keep_nodes的值
         keep_values = tf.nn.top_k(scoring, k=self.keep_nodes).values
         keep_indices = tf.nn.top_k(scoring, k=self.keep_nodes).indices
-        X_out = K.gather(X, keep_indices)  # 行选择
-        X_out = K.gather(X_out, keep_indices, axis=1)  # 列选择
-        A_out = A[keep_indices, keep_indices]
-        return [X_out, A_out, keep_values]
+
+        Xs_new, As_new = list, list()
+
+        def loop_condition(idx, interate, Xs, As, Xs_new, As_new):
+            return tf.less(idx, interate)
+
+        def loop_body(idx, interate, Xs, As, Xs_new, As_new):
+            X, A = K.gather(Xs, idx), K.gather(As, idx)  # 拿出对应位置的X, A
+            X_out = K.gather(X, keep_indices)  # 特征矩阵行选择
+            A_out = K.gather(A, keep_indices)  # 邻接矩阵行选择
+            A_out = K.gather(A_out, keep_indices, axis=1)  # 邻接矩阵列选择
+            Xs_new.append(X_out)  # 保存结果
+            As_new.append(A_out)
+            return tf.add(idx, 1), interate, X_out, A_out
+
+        tf.while_loop(loop_condition, loop_body, [0, self.batch_size, Xs, As, Xs_new, As_new])  # 循环
+
+        Xs_out = K.stack(Xs)  # 堆叠输出结果， (None, kN, F)
+        As_out = K.stack(As)  # (None, kN, kN)
+
+        return [Xs_out, As_out, keep_values]
 
     # 计算输出shape
     def compute_output_shape(self, input_shape):
-        X_shape = (self.keep_nodes, self.features_dim)
-        A_shape = (self.keep_nodes, self.keep_nodes)
-        scoring_shape = (self.keep_nodes,)
+        X_shape = (self.batch_size, self.keep_nodes, self.features_dim)  # (None, kN, F)
+        A_shape = (self.batch_size, self.keep_nodes, self.keep_nodes)  # (None, kN, kN)
+        scoring_shape = (self.batch_size, self.keep_nodes)  # (None, kN)
         output_shape = [X_shape, A_shape, scoring_shape]
         return output_shape
 

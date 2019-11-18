@@ -12,6 +12,7 @@ from keras import activations, initializers, constraints
 from keras import regularizers
 from keras.engine import Layer
 import keras.backend as K
+import tensorflow as tf
 
 
 class GraphConvolution(Layer):
@@ -46,12 +47,6 @@ class GraphConvolution(Layer):
 
         assert support >= 1
 
-    # 计算输出shape
-    def compute_output_shape(self, input_shape):
-        features_shape = input_shape[0]  # input = [X, A]
-        output_shape = (features_shape[0], self.units)
-        return output_shape
-
     # 初始化weight
     def build(self, input_shapes):
         features_shape = input_shapes[0]
@@ -79,18 +74,25 @@ class GraphConvolution(Layer):
 
     # 用来执行 Layer 的职能, 即当前 Layer 所有的计算过程均在该函数中完成
     def call(self, inputs, mask=None):
-        features, basis = inputs[0], inputs[1]  # X, A
+        features, basis = inputs[0], inputs[1]  # X, A [(None, N, F), (None, N, N)]
 
         supports = list()
 
         for i in range(self.support):
-            supports.append(K.dot(basis[i], features))  # A * X
-        supports = K.concatenate(supports, axis=1)  # 在给定轴上将一个列表中的张量串联为一个张量
-        output = K.dot(supports, self.kernel)  # A * X * W
+            supports.append(tf.matmul(basis[i], features))  # A * X (None, N, F)
+        supports = K.concatenate(supports, axis=2)  # 在给定轴上将一个列表中的张量串联为一个张量  (None, N, k*F)
+        output = K.dot(supports, self.kernel)  # A * X * W  (None, N, k*F_)
 
         if self.use_bias:  # 偏置
             output += self.bias
         return self.activation(output)  # sigma(A * X * W)
+
+    # 计算输出shape
+    def compute_output_shape(self, input_shape):
+        features_shape = input_shape[0]  # input = [X, A] [(None, N, F), (None, N, N)]
+        batch_size = input_shape[0][0]
+        output_shape = (batch_size, features_shape[1], self.units)  # (None, N, F_)
+        return output_shape
 
     # 输出当前网络配置
     def get_config(self):

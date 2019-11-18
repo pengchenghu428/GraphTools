@@ -11,7 +11,7 @@
 import os
 from layers import *
 from utils import *
-from keras.layers import Input, Dense, Dropout, LSTM
+from keras.layers import Input, Dense, Dropout, Concatenate
 from keras.models import Model
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.optimizers import Adam
@@ -33,8 +33,8 @@ dropout_rate = 0.6            # 丢失率
 l2_reg = 5e-4/2               # l2正则化因子
 learning_rate = 5e-3          # Adam 学习率
 epochs = 10000                # 迭代次数
-batch_size = 2              # batch 尺寸
-es_patience = 100             # 提前停止轮数
+batch_size = 16              # batch 尺寸
+es_patience = 10             # 提前停止轮数
 
 
 def data_prepared(Xs, As):
@@ -61,18 +61,23 @@ def create_attention_model(Xs, As):
                                        activation='elu',
                                        kernel_regularizer=l2(l2_reg),
                                        attn_kernel_regularizer=l2(l2_reg)
-                                       )([X_in, A_in])
-    # sag_pooling_X_1, sag_pooling_A_1, sag_pooling_keep_values_1 = SAGraphPooling(rate=0.5,
-    #                                                                              attn_heads=n_attn_heads,
-    #                                                                              attn_heads_reduction='mean',
-    #                                                                              activation='softmax',
-    #                                                                              attn_initializer='glorot_uniform')([graph_attention_1, A_in])
-    # read_out_1 = GlobalMeanMaxPooling(type='mean|max')([sag_pooling_X_1, sag_pooling_keep_values_1])
-    read_out_1 = GlobalMeanMaxPooling(type='mean|max')([graph_attention_1])
-
-    dense_1 = Dense(units=128, activation='relu')(read_out_1)
-    dropout_1 = Dropout(rate=0.5)(dense_1)
-    output = Dense(units=1, activation='sigmoid')(dropout_1)
+                                       )([X_in, A_in])  # gat
+    read_out_1 = GlobalMeanMaxPooling(type='mean|max')([graph_attention_1])  # read_out_1
+    graph_attention_2 = GraphAttention(units=32,
+                                      attn_heads=n_attn_heads,
+                                      attn_heads_reduction='average',
+                                      dropout_rate=dropout_rate,
+                                      activation='elu',
+                                      kernel_regularizer=l2(l2_reg),
+                                      attn_kernel_regularizer=l2(l2_reg)
+                                      )([graph_attention_1, A_in])  # gat
+    read_out_2 = GlobalMeanMaxPooling(type='mean|max')([graph_attention_2])  # read_out_2
+    merged_layer = Concatenate(axis=-1)([read_out_1, read_out_2])  # [read_out1, read_out2]
+    dense_1 = Dense(units=256, activation='relu')(merged_layer)  # dense
+    dropout_1 = Dropout(rate=0.5)(dense_1)  # dropout
+    dense_2 = Dense(units=128, activation='relu')(dropout_1)  # dense
+    dropout_2 = Dropout(rate=0.5)(dense_2)  # dropout
+    output = Dense(units=1, activation='sigmoid')(dropout_2)  # output
 
     # Build examples
     model = Model(inputs=[X_in, A_in], outputs=output)
@@ -81,7 +86,6 @@ def create_attention_model(Xs, As):
                   loss='binary_crossentropy',
                   weighted_metrics=['acc'])
     return model
-
 
 def train(Xs, As, y, path, name):
     '''
@@ -98,11 +102,12 @@ def train(Xs, As, y, path, name):
     model = create_attention_model(Xs, As)
 
     weight_path = "{}/{}/{}_model_weights.best.h5".format(dir, name, name)
+    checkd_directory(weight_path)
     checkpoint = ModelCheckpoint(filepath=weight_path, monitor='val_acc', verbose=0,
                                 save_best_only=True, mode='max')
     early_stopping = EarlyStopping(monitor='val_acc', patience=es_patience)
     callback_list = [checkpoint, early_stopping]
-    history = model.fit([Xs] + [As], y,
+    history = model.fit([Xs, As], y,
               epochs=epochs, batch_size=batch_size, shuffle=True,
               validation_split=0.1, callbacks=callback_list, verbose=1)
     model = load_model(path, name)  # 加载最优模型

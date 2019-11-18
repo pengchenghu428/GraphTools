@@ -125,29 +125,32 @@ class GraphAttention(Layer):
 
             # 计算特征联合
             # [[a_1], [a_2]]^T [[Wh_i], [Wh_j]] = [a_1]^T [Wh_i] + [a_2]^T [Wh_j]
-            attn_for_self = K.dot(features, attention_kernel[0])  # (batch X N x units), (units, 1) -> (batch X N, 1)
-            attn_for_neighs = K.dot(features, attention_kernel[1])  # (batch X N x units), (units, 1) -> (batch X N, 1)
+            attn_for_self = K.dot(features, attention_kernel[0])  # (batch, N, units), (units, 1) -> (batch, N, 1)
+            attn_for_neighs = K.dot(features, attention_kernel[1])  # (batch, N, units), (units, 1) -> (batch, N, 1)
 
             # 注意力机制 a(Wh_i, Wh_j) = a^T [[Wh_i], [Wh_j]]
-            dense = attn_for_self + K.transpose(attn_for_neighs)
+            # dense = attn_for_self + K.transpose(attn_for_neighs)  # K.transpose (batch, N, units)->(units, N, batch)
+            dense = attn_for_self + tf.transpose(attn_for_neighs, perm=[0, 2, 1])  # 第一维度不变，二、三维度转置
+            # print("dense0.shape:{}".format(K.int_shape(dense)))
 
             # 添加非线性变换
             dense = LeakyReLU(alpha=0.2)(dense)
+            # print("dense1.shape:{}".format(K.int_shape(dense)))
 
             # 激活前的掩码值
             mask = -10e9 * (1.0 - As)
-            # dense += mask  # bug
-            dense = K.bias_add(dense, mask)
+            # print("mask.shape:{}".format(K.int_shape(mask)))
+            dense = dense + mask  # bug
 
             # softmax 获得注意力分数
             dense = K.softmax(dense)
 
             # 对特征和注意力分数应用dropout
-            dropout_attn = Dropout(self.dropout_rate)(dense)  # (batch X N x N)
-            dropout_feat = Dropout(self.dropout_rate)(features)  # (batch X N x units)
+            dropout_attn = Dropout(self.dropout_rate)(dense)  # (batch, N, N)
+            dropout_feat = Dropout(self.dropout_rate)(features)  # (batch, N, units)
 
             # 注意力权重组合特征值
-            # node_features = K.dot(dropout_attn, dropout_feat)
+            # node_features = K.dot(dropout_attn, dropout_feat)  # K.dot 会提前resize矩阵，导致计算不成功
             node_features = tf.matmul(dropout_attn, dropout_feat)
 
             if self.use_bias:
