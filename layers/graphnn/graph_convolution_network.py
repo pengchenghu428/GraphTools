@@ -50,8 +50,8 @@ class GraphConvolution(Layer):
     # 初始化weight
     def build(self, input_shapes):
         features_shape = input_shapes[0]
-        assert len(features_shape) == 2  # 检查X的输入维度
-        input_dim = features_shape[1]  # 特征维度
+        assert len(features_shape) == 3  # 检查X的输入维度
+        input_dim = features_shape[-1]  # 特征维度
 
         # 权重
         self.kernel = self.add_weight(shape=(input_dim * self.support,  #
@@ -74,7 +74,7 @@ class GraphConvolution(Layer):
 
     # 用来执行 Layer 的职能, 即当前 Layer 所有的计算过程均在该函数中完成
     def call(self, inputs, mask=None):
-        features, basis = inputs[0], inputs[1]  # X, A [(None, N, F), (None, N, N)]
+        features, basis = inputs[0], inputs[1:]  # X, A [(None, N, F), (None, N, N)]
 
         supports = list()
 

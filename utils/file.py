@@ -21,10 +21,10 @@ def checkd_directory(path):
     '''
     if not os.path.exists(path):  # 判断该文件/文件夹是否存在
         dirs = path.split('/')
-        if '.' in dirs:  # 如果最后是文件，则弹出最后一个元素
+        if '.' in dirs[-1]:  # 如果最后是文件，则弹出最后一个元素
             dirs.pop()
         dir_path = '/'.join(dirs)  # 文件夹路径
-        if not os.path.exists(dirs):  # 文件夹不存在，则创建
+        if not os.path.exists(dir_path):  # 文件夹不存在，则创建
             os.makedirs(dir_path)
 
 

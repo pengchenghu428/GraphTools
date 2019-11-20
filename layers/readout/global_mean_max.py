@@ -75,3 +75,26 @@ class GlobalMeanMaxPooling(Layer):
         else:
             output_dim = 2 * X_dims
         return (batch_size, output_dim)   # 返回的是一维数组
+
+
+class GlobalMeanPooling(Layer):
+
+    def __init__(self,
+                 **kwargs):
+        super(GlobalMeanPooling, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        # input = X
+        self.build = True
+
+    def call(self, inputs):
+        X = inputs
+        x_mean = K.mean(X, axis=1)  # 论文中的 1/N * (sum(x_i)) -> (batch, X.shape[-1])
+        output = x_mean
+        return output
+
+    def compute_output_shape(self, input_shape):
+        batch_size = input_shape[0]
+        X_dims = input_shape[-1]
+        output_dim = X_dims
+        return (batch_size, output_dim)   # 返回的是一维数组

@@ -32,10 +32,10 @@ def normalize_adj(adj, symmetric=True):
     '''
     if symmetric:
         d = np.diag(np.power(np.array(adj.sum(1)), -0.5).flatten(), 0)
-        a_norm = adj.dot(d).transpose().dot(d).tocsr()
+        a_norm = d.dot(adj).dot(d)
     else:
         d = np.diag(np.power(np.array(adj.sum(1)), -1).flatten(), 0)
-        a_norm = d.dot(adj).tocsr()
+        a_norm = d.dot(adj)
     return a_norm
 
 
@@ -102,7 +102,7 @@ def resized_graph(Xs, As):
     return np.array(Xs), np.array(As).astype('int')
 
 
-def split_data(Xs, As, y, ratio=0.2, stratified=False):
+def split_data(Xs, As, y, ratio=0.2, As_norm=None, stratified=False):
     '''
     按一定比例划分数据
     :param Xs: 特征矩阵集合
@@ -116,6 +116,9 @@ def split_data(Xs, As, y, ratio=0.2, stratified=False):
     if not stratified:
         shuffle_idx = np.random.permutation(np.arange(len(y)))
         train_idx, test_idx = shuffle_idx[sample_number:], shuffle_idx[:sample_number]
+        if not As_norm is None:
+            return Xs[train_idx], As[train_idx], As_norm[train_idx], y[train_idx], \
+                   Xs[test_idx], As[test_idx], As_norm[test_idx], y[test_idx]
         return Xs[train_idx], As[train_idx], y[train_idx], Xs[test_idx], As[test_idx], y[test_idx]
     else:
         class_counter = Counter(y)  # 统计各个类别的数量
@@ -131,4 +134,7 @@ def split_data(Xs, As, y, ratio=0.2, stratified=False):
         train_idx = np.random.permutation(train_idx)  # 重新打乱数据
         test_idx = np.random.permutation(test_idx)
 
+        if not As_norm is None:
+            return Xs[train_idx], As[train_idx], As_norm[train_idx], y[train_idx], \
+                   Xs[test_idx], As[test_idx], As_norm[test_idx], y[test_idx]
         return Xs[train_idx], As[train_idx], y[train_idx], Xs[test_idx], As[test_idx], y[test_idx]

@@ -16,6 +16,19 @@ from layers import *
 from utils import *
 
 
+def load_model_weight(dir, name, model):
+    '''
+    加载现存的模型
+    :param dir:
+    :param name:
+    :param model:
+    :return:
+    '''
+    weight_path = "{}/{}/{}_model_weights.best.h5".format(dir, name, name)
+    model.load_weights(weight_path)
+    return model
+
+
 def load_model(dir, name):
     '''
     加载现存的模型
@@ -31,7 +44,8 @@ def load_model(dir, name):
                                             'DiffPooling': DiffPooling,
                                             'SAGraphPooling': SAGraphPooling,
                                             'SortPooling': SortPooling,
-                                            'GlobalMeanMaxPooling': GlobalMeanMaxPooling,})
+                                            'GlobalMeanMaxPooling': GlobalMeanMaxPooling,
+                                            'GlobalMeanPooling': GlobalMeanPooling})
     model.load_weights(weight_path)
     return model
 
