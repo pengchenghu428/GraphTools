@@ -12,6 +12,8 @@ import numpy as np
 from tqdm import tqdm
 from collections import Counter
 
+np.random.seed(42)  # 设定随机种子
+
 
 def add_self_adj(adj):
     '''

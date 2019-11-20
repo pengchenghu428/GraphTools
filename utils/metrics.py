@@ -20,7 +20,7 @@ def evaluate_binary_classification(y, y_pred):
     :return:dict
     '''
     res = dict()
-    y_pred_label = np.where(y_pred > 0.5, 0, 1)
+    y_pred_label = np.where(y_pred > 0.5, 1, 0)
     res['precise_score'] = precision_score(y, y_pred_label)
     res['recall_score'] = recall_score(y, y_pred_label)
     res['accuracy_score'] = accuracy_score(y, y_pred_label)

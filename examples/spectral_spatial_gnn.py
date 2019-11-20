@@ -16,7 +16,6 @@ from keras.layers import Input, Dense, Dropout, Concatenate
 from keras.models import Model
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.optimizers import Adam
-from keras.regularizers import l2
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -28,7 +27,10 @@ dataset_name = 'FRANKENSTEIN'
 model_save_path = 'output/models/'
 model_name = 'spectral_spatial_gnn'  # 基于时域和频域双重图卷积模型
 
-batch_size = 32
+# learning_rate = 5e-3          # Adam 学习率
+epochs = 10000                # 迭代次数
+batch_size = 64              # batch 尺寸
+es_patience = 5             # 提前停止轮数
 
 def data_prepared(Xs, As):
     '''
@@ -80,7 +82,9 @@ def create_ssgnn_model(Xs, As, As_norm):
     # dnn
     dense_1 = Dense(units=256, activation='relu')(merged_layer)  # dense
     dropout_1 = Dropout(rate=0.5)(dense_1)  # dropout
-    output = Dense(units=1, activation='sigmoid')(dropout_1)  # output
+    dense_2 = Dense(units=128, activation='relu')(dropout_1)  # dense
+    dropout_2 = Dropout(rate=0.5)(dense_2)  # dropout
+    output = Dense(units=1, activation='sigmoid')(dropout_2)  # output
 
     # Build examples
     model = Model(inputs=[Xs_in, As_in, As_norm_in], outputs=output)
@@ -110,13 +114,15 @@ def train(Xs, As, As_norm, y, path, name):
     checkd_directory(weight_path)
     checkpoint = ModelCheckpoint(filepath=weight_path, monitor='val_acc', verbose=0,
                                 save_best_only=True, mode='max')
-    early_stopping = EarlyStopping(monitor='val_acc', patience=10)
+    early_stopping = EarlyStopping(monitor='val_acc', patience=es_patience)
     callback_list = [checkpoint, early_stopping]
     history = model.fit([Xs, As, As_norm], y,
-              epochs=1000, batch_size=batch_size, shuffle=True,
+              epochs=epochs, batch_size=batch_size, shuffle=True,
               validation_split=0.2, callbacks=callback_list, verbose=1)
     model = load_model_weight(path, name, model)  # 加载最优模型
     save_model(path, name, model, history=history)   # 保存模型和训练参数
+    plot_train_process(path, name)  # 绘制训练过程
+    plot_model_architecture(path, name)  # 绘制模型结构图
 
 
 def predict(model, Xs, As, As_norm):
@@ -132,6 +138,7 @@ def predict(model, Xs, As, As_norm):
 
 
 def evaluate(y, y_pred, path=None, name=None):
+    print("Positive Ratio: {:.4f}%".format(1.0 * np.sum(y)/len(y) * 100.0))
     result = evaluate_binary_classification(y, y_pred)
     print_binary_evaluation_dict(result)  # 控制台输出
 
@@ -139,9 +146,8 @@ def evaluate(y, y_pred, path=None, name=None):
         metrics_path = "{}/{}/{}_metrics.txt".format(path, name, name)
         write_metrics_to_file(result, metrics_path)
 
-        result_path = "{}/{}/{}_result.txt".format(path, name, name)
+        result_path = "{}/{}/{}_result.csv".format(path, name, name)
         write_result_to_file(y, y_pred, result_path)
-
 
 
 if __name__ == "__main__":
@@ -154,4 +160,4 @@ if __name__ == "__main__":
     train(Xs_train, As_train, As_norm_train, y_train, model_save_path, model_name)
     model = load_model(model_save_path, model_name)  # 加载最优模型
     y_pred = predict(model,  Xs_test, As_test, As_norm_test)  # 预测结果
-    evaluate(y_test, y_pred)  # 评估模型
+    evaluate(y_test, y_pred, model_save_path, model_name)  # 评估模型

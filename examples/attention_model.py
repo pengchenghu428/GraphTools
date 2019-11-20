@@ -30,10 +30,10 @@ model_name = 'graph_att'
 n_attn_heads = 8              # 注意力机制数量
 dropout_rate = 0.6            # 丢失率
 l2_reg = 5e-4/2               # l2正则化因子
-learning_rate = 5e-3          # Adam 学习率
+# learning_rate = 5e-3          # Adam 学习率
 epochs = 10000                # 迭代次数
-batch_size = 32              # batch 尺寸
-es_patience = 10             # 提前停止轮数
+batch_size = 64              # batch 尺寸
+es_patience = 5             # 提前停止轮数
 
 
 def data_prepared(Xs, As):
@@ -78,7 +78,7 @@ def create_attention_model(Xs, As):
 
     # Build examples
     model = Model(inputs=[X_in, A_in], outputs=output)
-    optimizer = Adam(lr=learning_rate)
+    optimizer = Adam()
     model.compile(optimizer=optimizer,
                   loss='binary_crossentropy',
                   metrics=['accuracy'])
@@ -110,6 +110,8 @@ def train(Xs, As, y, path, name):
               validation_split=0.2, callbacks=callback_list, verbose=1)
     model = load_model_weight(path, name, model)  # 加载最优模型
     save_model(path, name, model, history=history)   # 保存模型和训练参数
+    plot_train_process(path, name)  # 绘制训练过程
+    plot_model_architecture(path, name)  # 绘制模型结构图
 
 
 def predict(model, Xs, As):
@@ -125,6 +127,7 @@ def predict(model, Xs, As):
 
 
 def evaluate(y, y_pred, path=None, name=None):
+    print("Positive Ratio: {:.4f}%".format(1.0 * np.sum(y) / len(y) * 100.0))
     result = evaluate_binary_classification(y, y_pred)  # 评价指标
     print_binary_evaluation_dict(result)  # 控制台输出
 
@@ -132,7 +135,7 @@ def evaluate(y, y_pred, path=None, name=None):
         metrics_path = "{}/{}/{}_metrics.txt".format(path, name, name)  # 保存指标
         write_metrics_to_file(result, metrics_path)
 
-        result_path = "{}/{}/{}_result.txt".format(path, name, name)  # 保存结果
+        result_path = "{}/{}/{}_result.csv".format(path, name, name)  # 保存结果
         write_result_to_file(y, y_pred, result_path)
 
 
