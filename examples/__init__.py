@@ -1,1 +1,0 @@
-from examples.attention_model import *

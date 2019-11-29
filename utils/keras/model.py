@@ -92,7 +92,7 @@ def plot_train_process(dir_path, name):
 
     for item in['loss', 'acc']:
         plt.plot(history[item])
-        plt.plot(history['val_'.format(item)])
+        plt.plot(history['val_{}'.format(item)])
 
         plt.xlabel('Epoch')
         plt.legend(['Train', 'Valid'])

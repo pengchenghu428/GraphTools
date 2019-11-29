@@ -31,7 +31,7 @@ class DiffPooling(Layer):
                  **kwargs):
         super(DiffPooling, self).__init__(**kwargs)
 
-        self.units = units  # DiffPooling后的节点数目，神经元个数
+        self.units = units  # DiffPooling后的节点数目
         self.activation = activations.get(activation)  # 激活函数
         self.use_bias = use_bias  # 是否使用偏置项
         self.kernel_initializer = initializers.get(kernel_initializer)  # 权值初始化方法

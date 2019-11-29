@@ -9,8 +9,8 @@
 =================================================='''
 
 import os
-from layers import *
-from utils import *
+from layers.keras import *
+from utils.keras import *
 from keras.layers import Input, Dense, Dropout, Concatenate
 from keras.models import Model
 from keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -141,7 +141,7 @@ def evaluate(y, y_pred, path=None, name=None):
 
 if __name__ == "__main__":
     # execute only if run as a script
-    os.chdir('../')
+    os.chdir('../../')
     Xs, As, y = load_data(dataset_path, dataset_name)  # 从磁盘加载数据
     Xs, As = data_prepared(Xs, As)
     Xs_train, As_train, y_train, Xs_test, As_test, y_test = split_data(Xs, As, y)  # 划分数据集
