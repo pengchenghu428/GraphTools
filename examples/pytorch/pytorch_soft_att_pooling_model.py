@@ -19,7 +19,7 @@ from collections import defaultdict
 import pickle
 
 from torch.utils.data import DataLoader
-from dgl.nn.pytorch import GATConv, GraphConv
+from dgl.nn.pytorch import GATConv, GraphConv, GINConv
 
 from layers.pytorch import *
 from utils.pytorch import *
@@ -33,14 +33,16 @@ GRAPH_LABELS_PATH = "{}/{}/{}.graph_labels".format(DATA_PATH, DATA_NAME, DATA_NA
 
 # 模型
 MODEL_SAVE_PATH = "output/models/"
-MODEL_NAME = "torch_gcn_soft_att_model"
+MODEL_NAME = "torch_gin_soft_att_model"
 BATCH_SIZE = 1024
 EPOCHS = 2000
-ES_PATIENCE = 30
-K = 16
+ES_PATIENCE = 20
+
 IN_FEATS = 780
-N_HIDDEN = [256, 256, 256]
-N_HEADS = [8, 8, 8]
+N_HIDDEN = [512, 256, 256, 128, 128, 64, 64, 32]
+N_HEADS = [8, 8, 8, 8]
+ACTIVATE_NODES = 16
+CHANNEL = 64
 ACTIVATION = F.leaky_relu
 DROPOUT = 0.5
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # 让torch判断是否使用GPU
@@ -54,67 +56,79 @@ torch.manual_seed(42)
 # 构建网络
 class SoftAttentionModel(nn.Module):
     def __init__(self,
-                 k,
                  in_feats,
                  n_hidden,
                  n_heads,
                  activation,
+                 activate_nodes,
+                 channel,
                  dropout):
         super(SoftAttentionModel, self).__init__()
-
-        self.k = k,
         self.n_hidden = n_hidden
         self.layers = nn.ModuleList()
         self.dropout = dropout
-        self.conv1_input_dim = np.sum(n_hidden)
+        self.activate_nodes = activate_nodes
+        self.activation = activation
+        self.conv_size = np.sum(n_hidden)
 
         # input layer
-        # self.gat_1 = GATConv(in_feats, n_hidden[0], num_heads=n_heads[0],
-        #                        feat_drop=dropout, attn_drop=dropout, activation=activation)
-        # self.gat_2 = GATConv(n_hidden[0], n_hidden[1], num_heads=n_heads[1],
-        #                        feat_drop=dropout, attn_drop=dropout, activation=activation)
-        # self.gat_3 = GATConv(n_hidden[1], n_hidden[2], num_heads=n_heads[2],
-        #                        feat_drop=dropout, attn_drop=dropout, activation=activation)
-        self.gcn_1 = GraphConv(in_feats, n_hidden[0], activation=activation)
-        self.gcn_2 = GraphConv(n_hidden[0], n_hidden[1], activation=activation)
-        self.gcn_3 = GraphConv(n_hidden[1], n_hidden[2], activation=activation)
+        self.gnn_layers = nn.ModuleList()
+        # GAT
+        # self.gnn_layers.append(GATConv(in_feats, n_hidden[0], num_heads=n_heads[0],
+        #                       feat_drop=dropout, attn_drop=dropout,
+        #                       residual=True, activation=activation))
+
+        # GCN
+        # self.gnn_layers.append(GraphConv(in_feats, n_hidden[0], activation=activation))
+
+        # GIN
+        self.gnn_layers.append(GINConv(apply_func=nn.Linear(in_feats, n_hidden[0]),
+                                       aggregator_type='sum',
+                                       init_eps=0.1,
+                                       learn_eps=True))
+        for idx in range(len(n_hidden)-1):
+            # self.gnn_layers.append(GATConv(n_hidden[idx], n_hidden[idx+1], num_heads=n_heads[idx+1],
+            #                                feat_drop=dropout, attn_drop=dropout,
+            #                                residual=True, activation=activation))
+
+            # self.gnn_layers.append(GraphConv(n_hidden[idx], n_hidden[idx+1], activation=activation))
+
+            self.gnn_layers.append(GINConv(apply_func=nn.Linear(n_hidden[idx], n_hidden[idx+1]),
+                                           aggregator_type='sum',
+                                           init_eps=0.1,
+                                           learn_eps=True))
+
         # read_out
-        self.soft_att_pooling_1 = SoftAttentionPooling(k, in_feats=n_hidden[0])
-        self.soft_att_pooling_2 = SoftAttentionPooling(k, in_feats=n_hidden[1])
-        self.soft_att_pooling_3 = SoftAttentionPooling(k, in_feats=n_hidden[2])
+        self.soft_att_poolings = nn.ModuleList()
+        for idx in range(len(n_hidden)):
+            self.soft_att_poolings.append(SoftAttentionPooling(activate_nodes, in_feats=n_hidden[idx]))
 
         # output layer
-        channel = 64
-        self.conv_1 = nn.Conv1d(1, channel, np.sum(n_hidden), stride=np.sum(n_hidden))
-        self.fc_1 = nn.Linear(channel*k, 128)
-        # self.conv_1 = nn.Conv1d(1, channel, n_hidden[2], stride=n_hidden[2])
-        # self.fc_1 = nn.Linear(channel * k, 128)
+        self.conv_1 = nn.Conv1d(1, channel, self.conv_size, stride=self.conv_size)
+        self.fc_1 = nn.Linear(channel*activate_nodes, 128)
         self.fc_2 = nn.Linear(128, 2)
 
     def forward(self, graph):
         feature = graph.ndata['h'].float()
-        # gat1 = self.gat_1(graph, feature)
-        # gat1 = torch.mean(gat1, dim=1).view(-1, self.n_hidden[0])
-        gcn1 = self.gcn_1(graph, feature)
-        readout_1 = self.soft_att_pooling_1(graph, gcn1)
 
-        # gat2 = self.gat_2(graph, gat1)
-        # gat2 = torch.mean(gat2, dim=1).view(-1, self.n_hidden[1])
-        gcn2 = self.gcn_2(graph, gcn1)
-        readout_2 = self.soft_att_pooling_2(graph, gcn2)
+        readouts = list()
+        for idx in range(len(self.gnn_layers)):
+            feature = self.gnn_layers[idx](graph, feature)
 
-        # gat3 = self.gat_3(graph, gat2)
-        # gat3 = torch.mean(gcn3, dim=1).view(-1, self.n_hidden[2])
-        gcn3 = self.gcn_3(graph, gcn2)
-        readout_3 = self.soft_att_pooling_3(graph, gcn3)
+            # feature = torch.mean(feature, dim=1).view(-1, self.n_hidden[idx])
+
+            feature = self.activation(feature)
+
+            readouts.append(self.soft_att_poolings[idx](graph, feature))
 
         # 融合层
-        merged = torch.cat([readout_1, readout_2, readout_3], dim=2)
-        # merged = readout_3
+        merged = torch.cat(readouts, dim=2)
         merged = merged.view(merged.size()[0], 1, -1)
+
         # 卷积层
         conv1 = self.conv_1(merged)
         conv1 = F.leaky_relu(conv1)
+
         # 全连接层
         fc1 = conv1.view(conv1.size()[0], -1)
         dropout_1 = nn.Dropout(self.dropout)(fc1)
@@ -122,7 +136,7 @@ class SoftAttentionModel(nn.Module):
         dropout_2 = nn.Dropout(self.dropout)(fc1)
         fc2 = self.fc_2(dropout_2)
         out = torch.sigmoid(fc2)
-        return out
+        return out, graph
 
     def get_flatten_size(self, x):
         size = x.size()[1:]
@@ -133,12 +147,13 @@ class SoftAttentionModel(nn.Module):
 
 
 # 网络初始化
-soft_attention_model = SoftAttentionModel(k=K,
-                               in_feats=IN_FEATS,
-                               n_hidden=N_HIDDEN,
-                               n_heads=N_HEADS,
-                               activation=ACTIVATION,
-                               dropout=DROPOUT)
+soft_attention_model = SoftAttentionModel(in_feats=IN_FEATS,
+                                          n_hidden=N_HIDDEN,
+                                          n_heads=N_HEADS,
+                                          activation=ACTIVATION,
+                                          activate_nodes=ACTIVATE_NODES,
+                                          channel=CHANNEL,
+                                          dropout=DROPOUT)
 soft_attention_model.to(DEVICE)  # 把整个模型放在GPU上
 optimizer = optim.Adam(soft_attention_model.parameters())
 criterion = nn.CrossEntropyLoss(reduction='sum')
@@ -189,12 +204,13 @@ pickle.dump(history, open(model_history_path, 'wb'))  # 保存训练结果
 plot_train_process(MODEL_SAVE_PATH, MODEL_NAME)
 
 # 加载模型并评估模型
-soft_attention_best_model = SoftAttentionModel(k=K,
-                               in_feats=IN_FEATS,
-                               n_hidden=N_HIDDEN,
-                               n_heads=N_HEADS,
-                               activation=ACTIVATION,
-                               dropout=DROPOUT).to(DEVICE)
+soft_attention_best_model = SoftAttentionModel(in_feats=IN_FEATS,
+                                          n_hidden=N_HIDDEN,
+                                          n_heads=N_HEADS,
+                                          activation=ACTIVATION,
+                                          activate_nodes=ACTIVATE_NODES,
+                                          channel=CHANNEL,
+                                          dropout=DROPOUT).to(DEVICE)
 optimizer = optim.Adam(soft_attention_best_model.parameters())
 soft_attention_best_model.load_state_dict(torch.load(model_weight_save_path))
 soft_attention_best_model.eval()

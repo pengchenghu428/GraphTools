@@ -95,10 +95,16 @@ class GraphDataset(object):
             mask = np.isin(edges, node).all(axis=1)  # 切分出对应的连接
             edge = edges[mask]
             edge_sub_min = edge - np.min(edge)  # 从0开始编号
+            # 生成 DGLGraph
             g = dgl.DGLGraph()
             g.add_nodes(node_length)
             g.add_edges(edge_sub_min[:, 0], edge_sub_min[:, 1])
             g.ndata['h'] = np.eye(node_length, dtype=int) if node_attrs is None else node_attrs[node - 1]
+            # 邻接矩阵信息
+            # adj = np.zeros((node_length, node_length), dtype=int)
+            # adj[edge_sub_min[:, 0], edge_sub_min[:, 1]] = 1
+            # adj += np.eye(node_length, dtype=int)
+            # g.ndata['adj'] = adj
             data.append(g)
         y = np.where(graph_labels == -1, 1, 0)[available_graph_idx-1].tolist()
         return data, y

@@ -25,9 +25,11 @@ def collate(samples, device=torch.device('cuda')):
     if not device is None:
         for idx in range(len(samples)):  # 送进GPU中
             samples[idx][0].to(device)
+
     graphs, labels = map(list, zip(*samples))
     batched_graph = dgl.batch(graphs)
-    return batched_graph, torch.tensor(labels)
+
+    return batched_graph, torch.tensor(labels),
 
 
 def get_dataset_info(dirpath="data/", dataset="FRANKENSTEIN"):

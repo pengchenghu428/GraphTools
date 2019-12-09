@@ -27,8 +27,8 @@ def do_predict(model, device, test_dataset, test_loader=None, batch_size=256):
     y_pred = []
     with torch.no_grad():
         for batch_idx, (data, target) in enumerate(test_loader):
-            target = target.to(device)
-            output = model(data)
+            # target = target.to(device)
+            output, graph = model(data)
             # pred = output.max(1, keepdim=True)[1].view(-1)  # 找到概率最大的下标
             proba = output[:, 1].view(-1)
             y_pred.append(proba)

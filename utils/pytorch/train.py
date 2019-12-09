@@ -33,11 +33,10 @@ def do_train(model, device, train_loader, optimizer, criterion):
     correct, batch_correct = 0, 0
     progress_bar = "\r\t{}/{} [{}{}] - loss: {:.4f} - acc: {:.4f}"
     for batch_idx, (data, target) in enumerate(train_loader):
-        train_loader.dataset.target = []
 
         target = target.to(device)
         optimizer.zero_grad()
-        output = model(data)
+        output, graphs = model(data)
         batch_loss = criterion(output, target)  # batch 损失
         loss += batch_loss  # 总体损失
         batch_loss.backward()  # 梯度下降
@@ -69,7 +68,7 @@ def do_test(model, device, test_loader, criterion):
     with torch.no_grad():
         for batch_idx, (data, target) in enumerate(test_loader):
             target = target.to(device)
-            output = model(data)
+            output, graphs = model(data)
             test_loss += criterion(output, target)  # 将一批的损失相加
             pred = output.max(1, keepdim=True)[1]  # 找到概率最大的下标
             correct += pred.eq(target.view_as(pred)).sum().item()
@@ -79,4 +78,85 @@ def do_test(model, device, test_loader, criterion):
     test_acc = correct/len(test_loader.dataset)
     print(' - val_loss: {:.4f} - val_acc: {:.4f}'.format(test_loss, test_acc))
     return test_loss, test_acc
+
+
+# 封装训练和重建过程
+def do_train_and_rebuild(model, device, train_loader, optimizer, criterion):
+    '''
+    模型训练
+    :param model: 模型
+    :param device: 设备位置
+    :param train_loader: 训练集数据
+    :param train_length: 训练集数据
+    :param optimizer: 优化器
+    :param criterion: 损失函数/评价指标
+    :param epoch: 当前迭代轮次
+    :return:
+    '''
+    model.train()
+    loss, classify_loss, rebuild_loss = 0, 0, 0
+    train_size = len(train_loader.dataset)  # 训练大小
+    trained_size = 0  # 已训练大小
+    correct, batch_correct = 0, 0
+    progress_bar = "\r\t{}/{} [{}{}] -loss:{:.4f} -loss_c:{:.4f} -loss_r:{:.4f} -acc:{:.4f}"
+
+    for batch_idx, (data, target) in enumerate(train_loader):
+
+        target = target.to(device)
+        optimizer.zero_grad()
+        output, graphs = model(data)
+        batch_loss, batch_classify_loss, batch_construct_loss = criterion(output, target, graphs)  # batch 损失
+        batch_loss.backward()  # 梯度下降
+        optimizer.step()  # 参数更新
+
+        # 训练进度条显示
+        loss += batch_loss * len(target)  # 总体损失
+        classify_loss += batch_classify_loss * len(target)  # 总体损失
+        rebuild_loss += batch_construct_loss * len(target)  # 总体损失
+        trained_size += len(target)
+        trained_bar = round(trained_size/train_size * 20)
+        arrow, dot = ">"*trained_bar, "."*(20-trained_bar)
+        pred = output.max(1, keepdim=True)[1]  # 找到概率最大的下标
+        batch_correct = pred.eq(target.view_as(pred)).sum().item()
+        correct += batch_correct
+        print(progress_bar.format(trained_size, train_size, arrow, dot,
+                                  batch_loss.item(), batch_classify_loss, batch_construct_loss,
+                                  batch_correct/len(target)), end="")
+    # 整体的loss显示
+    loss /= train_size
+    classify_loss /= train_size
+    rebuild_loss /= train_size
+    loss = loss.item()
+    acc = correct / trained_size
+    print(progress_bar.format(trained_size, train_size, arrow, dot,
+                              loss, classify_loss, rebuild_loss,
+                              acc), end="")
+    return classify_loss, acc
+
+
+# 封装测试过程
+def do_test_and_rebuild(model, device, test_loader, criterion):
+    model.eval()
+    test_loss, classify_loss, rebuild_loss = 0, 0, 0
+    correct = 0
+    with torch.no_grad():
+        for batch_idx, (data, target) in enumerate(test_loader):
+            target = target.to(device)
+            output, graphs = model(data)
+            # test_loss += criterion(output, target)  # 将一批的损失相加
+            batch_loss, batch_classify_loss, batch_construct_loss = criterion(output, target, graphs)
+            test_loss += batch_loss * len(target)  # 将一批的损失相加
+            classify_loss += batch_classify_loss * len(target)  # 将一批的损失相加
+            rebuild_loss += batch_construct_loss * len(target)  # 将一批的损失相加
+            pred = output.max(1, keepdim=True)[1]  # 找到概率最大的下标
+            correct += pred.eq(target.view_as(pred)).sum().item()
+
+    test_loss /= len(test_loader.dataset)
+    classify_loss /= len(test_loader.dataset)
+    rebuild_loss /= len(test_loader.dataset)
+    test_loss = test_loss.item()
+    test_acc = correct/len(test_loader.dataset)
+    print(' -val_loss:{:.4f} -val_loss_c:{:.4f} -val_loss_r:{:.4f} -val_acc:{:.4f}'.format(
+        test_loss, classify_loss, rebuild_loss, test_acc))
+    return classify_loss, test_acc
 
