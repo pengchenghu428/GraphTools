@@ -54,6 +54,7 @@ class GraphDataset(object):
         '''
         return self.data[idx], self.target[idx]
 
+    # 从磁盘读取数据文件
     def read_from_disk(self, srcpath, name):
         '''
         从磁盘读取原始图数据
@@ -77,6 +78,7 @@ class GraphDataset(object):
 
         return graph_idx, edges, graph_labels, node_attrs
 
+    # 拆分多张图
     def split_multi_graph(self, graph_idx, edges, graph_labels, node_attrs, available_graph_idx):
         '''
         将原始大图划分成各个子图
@@ -100,14 +102,13 @@ class GraphDataset(object):
             g.add_nodes(node_length)
             g.add_edges(edge_sub_min[:, 0], edge_sub_min[:, 1])
             g.ndata['h'] = np.eye(node_length, dtype=int) if node_attrs is None else node_attrs[node - 1]
-            # 邻接矩阵信息
-            # adj = np.zeros((node_length, node_length), dtype=int)
-            # adj[edge_sub_min[:, 0], edge_sub_min[:, 1]] = 1
-            # adj += np.eye(node_length, dtype=int)
-            # g.ndata['adj'] = adj
             data.append(g)
         y = np.where(graph_labels == -1, 1, 0)[available_graph_idx-1].tolist()
         return data, y
+
+    # 获取节点特征矩阵维度
+    def get_feature_size(self):
+        return self.data[0].ndata['h'].size()[-1]
 
 if __name__ == "__main__":
     # execute only if run as a script

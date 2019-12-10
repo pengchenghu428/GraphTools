@@ -38,8 +38,8 @@ def do_predict(model, device, test_dataset, test_loader=None, batch_size=256):
 def plot_train_process(dir_path, name):
     '''
     绘制训练过程的图
-    :param dir_path:
-    :param name:
+    :param dir_path: 保存位置
+    :param name: 模型名称
     :return:
     '''
     history_path = "{}/{}/{}_history.pkl".format(dir_path, name, name)
@@ -59,4 +59,29 @@ def plot_train_process(dir_path, name):
         fig_path = history_path.replace('.pkl', '_{}.png'.format(item))
         fig.savefig(fig_path, dpi=100)
 
+        plt.cla()
+
+
+def draw_train_process_cruve(history_filepath):
+    '''
+    绘制训练过程的图
+    :param dir_path:
+    :param name:
+    :return:
+    '''
+    if not os.path.exists(history_filepath):
+        print("Plot_train_process: 训练数据不存在")
+
+    history = pickle.load(open(history_filepath, 'rb'))
+
+    for item in['loss', 'acc']:
+        plt.plot(history[item])
+        plt.plot(history['val_{}'.format(item)])
+
+        plt.xlabel('Epoch')
+        plt.legend(['Train', 'Valid'])
+
+        fig = plt.gcf()
+        fig_path = history_filepath.replace('.pkl', '_{}.png'.format(item))
+        fig.savefig(fig_path, dpi=100)
         plt.cla()

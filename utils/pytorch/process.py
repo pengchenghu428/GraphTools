@@ -29,7 +29,7 @@ def collate(samples, device=torch.device('cuda')):
     graphs, labels = map(list, zip(*samples))
     batched_graph = dgl.batch(graphs)
 
-    return batched_graph, torch.tensor(labels),
+    return batched_graph, torch.tensor(labels)
 
 
 def get_dataset_info(dirpath="data/", dataset="FRANKENSTEIN"):

@@ -25,7 +25,8 @@ dataset_dir = conf.get('dataset', 'dataset_dir')  # 数据集位置
 dataset_name = conf.get('dataset', 'dataset_name')  # 数据集名字
 
 # 训练参数
-random_seed = conf.get('train', 'random_seed').strip().split(',')  # 随机种子设定
+random_seeds = conf.get('train', 'random_seeds').strip().split(',')  # 随机种子设定
+random_seeds = [int(random_seed) for random_seed in random_seeds]
 n_fold = int(conf.get('train', 'n_fold'))  # 折数
 epoch = int(conf.get('train', 'epoch'))  # 迭代数
 es_patience = int(conf.get('train', 'es_patience'))  # 提前停止数
@@ -33,7 +34,8 @@ batch_size = int(conf.get('train', 'batch_size'))  # 提前停止数
 lr = float(conf.get('train', 'lr'))  # 学习率
 
 # 模型参数
-n_hidden = conf.get('model', 'lr').strip().split(',')  # 隐藏神经元数目
+n_hidden = conf.get('model', 'n_hidden').strip().split(',')  # 隐藏神经元数目
+n_hidden = [int(unit) for unit in n_hidden]
 n_output = int(conf.get('model', 'n_output'))  # 输出类别数
 pooling_type = conf.get('model', 'pooling_type')  # 池化方式
 dropout = float(conf.get('model', 'dropout'))
