@@ -4,8 +4,8 @@
 @Project -> File   ：GraphTools -> read_gcn_config
 @IDE    ：PyCharm
 @Author ：pengchenghu
-@Date   ：2019/12/9 16:56
-@Desc   ：读取gcn_config的内容
+@Date   ：2019/12/11 09:50
+@Desc   ：读取set2set_config的内容
 =================================================='''
 
 import os
@@ -15,7 +15,7 @@ import configparser
 cur_path = os.path.dirname(os.path.realpath(__file__))
 
 # 获取config.ini的路径
-config_path = os.path.join(cur_path, 'gcn_config.ini')
+config_path = os.path.join(cur_path, 'set2set_config.ini')
 
 conf=configparser.ConfigParser()
 conf.read(config_path, encoding="utf-8-sig")
@@ -36,6 +36,8 @@ lr = float(conf.get('train', 'lr'))  # 学习率
 # 模型参数
 n_hidden = conf.get('model', 'n_hidden').strip().split(',')  # 隐藏神经元数目
 n_hidden = [int(unit) for unit in n_hidden]
+n_step = int(conf.get('model', 'n_step'))
+n_layer = int(conf.get('model', 'n_layer'))
 n_output = int(conf.get('model', 'n_output'))  # 输出类别数
 pooling_type = conf.get('model', 'pooling_type')  # 池化方式
 dropout = float(conf.get('model', 'dropout'))

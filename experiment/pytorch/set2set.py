@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 '''=================================================
-@Project -> File   ：GraphTools -> gcn
+@Project -> File   ：GraphTools -> set2set
 @IDE    ：PyCharm
 @Author ：pengchenghu
-@Date   ：2019/12/9 17:11
-@Desc   ：GCN 模型实验
+@Date   ：2019/12/11 9:38
+@Desc   ：
 =================================================='''
+
 import os
 import pickle
 import numpy as np
@@ -14,13 +15,9 @@ import torch as th
 import torch.nn as nn
 import torch.optim as opt
 import torch.nn.functional as F
-import config.read_gcn_config as config
+import config.read_set2set_config as config
 
-from collections import defaultdict
-from sklearn.model_selection import StratifiedKFold
-from torch.utils.data import DataLoader
-from dgl.nn.pytorch import GraphConv, SumPooling, MaxPooling
-from dgl.data import Subset
+from dgl.nn.pytorch import GraphConv, Set2Set
 from utils.pytorch import *
 from layers.pytorch import *
 
@@ -29,26 +26,33 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # 让torc
 
 
 # GCN 分类器
-class GCNClassifier(nn.Module):
+class Set2SetClassifier(nn.Module):
     def __init__(self,
                  in_feats,
                  n_output=2,
                  n_hidden=[256, 256, 256],
+                 n_step=10,
+                 n_layer=2,
                  activation=F.leaky_relu,
                  dropout=0.5,
                  pooling_type='h'):
-        super(GCNClassifier, self).__init__()
+        super(Set2SetClassifier, self).__init__()
+        self.n_hidden = n_hidden
         self.pooling_type = pooling_type
         self.dropout = dropout
         self.activation = activation
 
-        self.gcn_layers = nn.ModuleList()
-        self.gcn_layers.append(GraphConv(in_feats, n_hidden[0], activation=activation))
+        self.graph_layers = nn.ModuleList()
+        self.graph_layers.append(GraphConv(in_feats, n_hidden[0], activation=activation))
         for i in range(len(n_hidden)-1):
-            self.gcn_layers.append(GraphConv(n_hidden[i], n_hidden[i+1], activation=activation))
+            self.graph_layers.append(GraphConv(n_hidden[i], n_hidden[i+1], activation=activation))
+        self.set2set_pools = nn.ModuleList()
+        for i in range(len(n_hidden)):
+            self.set2set_pools.append(Set2Set(input_dim=n_hidden[i], n_iters=n_step, n_layers=n_layer))
 
         if pooling_type == 'h':
             self.dense_1 = nn.Linear(2*np.sum(n_hidden), 128)
+            # self.dense_1 = nn.Linear(2 * n_hidden[-1], 128)
         else:
             self.dense_1 = nn.Linear(2*n_hidden[-1], 128)
         self.dense_2 = nn.Linear(128, n_output)
@@ -56,11 +60,11 @@ class GCNClassifier(nn.Module):
     def forward(self, graph):
         readouts = list()
 
-        # GCN
+        # backbone
         feat = graph.ndata['h'].float()
-        for gcn_layer in self.gcn_layers:
-            feat = gcn_layer(graph, feat)
-            readouts.append(SumMaxPooling()(graph, feat))
+        for idx, graph_layer in enumerate(self.graph_layers):
+            feat = graph_layer(graph, feat)
+            readouts.append(self.set2set_pools[idx](graph, feat))
 
         if self.pooling_type == 'h':
             merged = th.cat(readouts, dim=1)
@@ -85,10 +89,10 @@ class GCNClassifier(nn.Module):
 
 
 # 模型构建
-def build_model(in_feats, n_output=2,n_hidden=[256, 256, 256],
+def build_model(in_feats, n_output=2,n_hidden=[256, 256, 256], n_step=10, n_layer=2,
                 activation=nn.LeakyReLU, dropout=0.5, pooling_type='h'):
-    model = GCNClassifier(in_feats=in_feats, n_output=n_output,
-                          n_hidden=n_hidden, activation=activation,
+    model = Set2SetClassifier(in_feats=in_feats, n_output=n_output,
+                          n_hidden=n_hidden, n_step=n_step, n_layer=n_layer, activation=activation,
                           dropout=dropout, pooling_type=pooling_type).to(DEVICE)
     optimizer = opt.Adam(model.parameters(), lr=config.lr)
     criterion = nn.CrossEntropyLoss(reduction='sum')
@@ -104,16 +108,16 @@ def load_data(root_path, name):
 def main():
     # 加载数据
     graph_dataset = load_data(config.dataset_dir, config.dataset_name)
-    model_name = "{}ep_{}es_{:.5f}lr_{}hi_{:.2f}dp_{}pt_{}fd".format(config.epoch, config.es_patience,
+    model_name = "{}ep_{}es_{:.5f}lr_{}hi_{:.2f}dp_{}pt_{}fd_{}ns_{}nl".format(config.epoch, config.es_patience,
                                                                      config.lr, config.n_hidden,
                                                                      config.dropout, config.pooling_type,
-                                                                     config.n_fold)
+                                                                     config.n_fold, config.n_step, config.n_layer)
 
     # 构建参数模型
     def build_gcn_model():
         return build_model(graph_dataset.get_feature_size(), n_output=config.n_output,
-                           n_hidden=config.n_hidden, activation=F.leaky_relu,
-                           dropout=config.dropout, pooling_type=config.pooling_type)
+                           n_hidden=config.n_hidden, n_step=config.n_step, n_layer=config.n_layer,
+                           activation=F.leaky_relu, dropout=config.dropout, pooling_type=config.pooling_type)
 
     # 多随机种子10-折训练
     metrics_results = list()
@@ -125,10 +129,11 @@ def main():
         metrics_results.append(metrics_result)
     result = pd.concat(metrics_results, axis=0, ignore_index=True)
     result.to_csv("{}/{}/result.csv".format(config.save_dir, model_name), index=False)
-    result.describe().to_cav("{}/{}/result_describe.csv".format(config.save_dir, model_name), index=False)
+    result.describe().to_csv("{}/{}/result_describe.csv".format(config.save_dir, model_name), index=False)
 
 
 if __name__ == "__main__":
     # execute only if run as a script
-    print("GCN_Classifier_Experiments")
+    print("Set2Set_Classifier_Experiments")
     main()
+

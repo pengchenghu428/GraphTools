@@ -219,6 +219,8 @@ def k_fold_train(dataset, model_fn, n_fold,
     metrics_result['random_seed'] = random_seed
     metrics_result.to_csv("{}/{}/{}/metrics_result.csv".format(save_path, model_name, random_seed),
                           index=False)
+    metrics_result.describe().to_csv("{}/{}/{}/metrics_result_describe.csv".format(save_path, model_name, random_seed),
+                          index=False)
     return metrics_result
 
 
