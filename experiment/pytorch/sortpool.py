@@ -10,6 +10,7 @@
 
 import os
 import pickle
+import warnings
 import numpy as np
 import torch as th
 import torch.nn as nn
@@ -21,6 +22,8 @@ from dgl.nn.pytorch import GraphConv, SortPooling
 from utils.pytorch import *
 from layers.pytorch import *
 
+warnings.filterwarnings('ignore')
+warnings.filterwarnings(action='ignore', category=UserWarning)
 os.chdir('../../')
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # 让torch判断是否使用GPU
 
@@ -76,10 +79,12 @@ class SortClassifier(nn.Module):
             merged = readouts[-1]
         merged = merged.view(-1, 1, self.get_flatten_size(merged))
         conv1 = self.conv_1(merged)
+        conv1 = self.activation(conv1)
         fc = conv1.view(conv1.size()[0], -1)
         # MLP
         dropout1 = nn.Dropout(self.dropout)(fc)
         dense1 = self.dense_1(dropout1)
+        dense1 = self.activation(dense1)
         dropout2 = nn.Dropout(self.dropout)(dense1)
         dense2 = self.dense_2(dropout2)
         out = th.sigmoid(dense2)

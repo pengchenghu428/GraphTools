@@ -22,6 +22,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 dataset_path = 'data/'
 dataset_name = 'FRANKENSTEIN'

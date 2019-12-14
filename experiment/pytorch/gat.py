@@ -10,6 +10,7 @@
 
 import os
 import pickle
+import warnings
 import numpy as np
 import torch as th
 import torch.nn as nn
@@ -21,7 +22,8 @@ from dgl.nn.pytorch import GATConv
 from utils.pytorch import *
 from layers.pytorch import *
 
-
+warnings.filterwarnings('ignore')
+warnings.filterwarnings(action='ignore', category=UserWarning)
 os.chdir('../../')
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # 让torch判断是否使用GPU
 
@@ -75,6 +77,7 @@ class GATClassifier(nn.Module):
         merged = merged.view(-1, self.get_flatten_size(merged))
         dropout1 = nn.Dropout(self.dropout)(merged)
         dense1 = self.dense_1(dropout1)
+        dense1 = self.activation(dense1)
         dropout2 = nn.Dropout(self.dropout)(dense1)
         dense2 = self.dense_2(dropout2)
         out = th.sigmoid(dense2)

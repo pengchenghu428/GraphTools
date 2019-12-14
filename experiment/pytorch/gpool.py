@@ -10,6 +10,7 @@
 
 import os
 import pickle
+import warnings
 import numpy as np
 import torch as th
 import torch.nn as nn
@@ -21,6 +22,8 @@ from dgl.nn.pytorch import GraphConv, Set2Set
 from utils.pytorch import *
 from layers.pytorch import *
 
+warnings.filterwarnings('ignore')
+warnings.filterwarnings(action='ignore', category=UserWarning)
 os.chdir('../../')
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # 让torch判断是否使用GPU
 
@@ -64,7 +67,7 @@ class GPoolClassifier(nn.Module):
         if self.pooling_type == 'h':
             for idx, graph_layer in enumerate(self.graph_layers):
                 feat = graph_layer(graph, feat)
-                graph, feat = self.gpool_layers(graph, feat)
+                graph, feat = self.gpool_layers[idx](graph, feat)
                 readouts.append(SumMaxPooling()(graph, feat))
             merged = th.cat(readouts, dim=1)
         else:
@@ -81,6 +84,7 @@ class GPoolClassifier(nn.Module):
         merged = merged.view(-1, self.get_flatten_size(merged))
         dropout1 = nn.Dropout(self.dropout)(merged)
         dense1 = self.dense_1(dropout1)
+        dense1 = self.activation(dense1)
         dropout2 = nn.Dropout(self.dropout)(dense1)
         dense2 = self.dense_2(dropout2)
         out = th.sigmoid(dense2)

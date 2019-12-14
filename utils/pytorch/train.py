@@ -177,7 +177,8 @@ def do_test_and_rebuild(model, device, test_loader, criterion):
 def k_fold_train(dataset, model_fn, n_fold,
                  save_path, model_name, device,
                  batch_size=1024, random_seed=42,
-                 epochs=1000, es_patience=20):
+                 epochs=1000, es_patience=20,
+                 rebuild=False):
     print("start train {}_fold with {}".format(n_fold, model_name))
 
     sfolder = StratifiedKFold(n_splits=n_fold, random_state=random_seed, shuffle=True)
@@ -206,7 +207,7 @@ def k_fold_train(dataset, model_fn, n_fold,
         train_model(graph_dataloader, random_seed=random_seed, model=model,
                     save_path=save_path, model_name=model_name, fold_idx=fold_idx,
                     optimizer=optimizer, criterion=criterion, device=device,
-                    epochs=epochs, es_patience=es_patience)
+                    epochs=epochs, es_patience=es_patience, rebuild=rebuild)
         # 加载最优模型
         best_model = load_best_model(model, save_path=save_path,
                                      model_name=model_name, random_seed=random_seed,
@@ -228,7 +229,8 @@ def k_fold_train(dataset, model_fn, n_fold,
 def train_model(graph_dataloader, random_seed, model,
                 save_path, model_name, fold_idx,
                 optimizer, criterion, device,
-                epochs=1000, es_patience=20):
+                epochs=1000, es_patience=20,
+                rebuild=False):
     best_val_loss = np.inf
     history = defaultdict(list)
     model_save_dir = "{}/{}/{}/fold_{}".format(save_path, model_name, random_seed, fold_idx)
@@ -239,8 +241,12 @@ def train_model(graph_dataloader, random_seed, model,
                                                             len(graph_dataloader['valid'].dataset)))
     for epoch in range(1, epochs + 1):
         print("Epoch {}/{}".format(epoch, epochs))
-        loss, acc = do_train(model, device, graph_dataloader["train"], optimizer, criterion)
-        val_loss, val_acc = do_test(model, device, graph_dataloader["valid"], criterion)
+        if not rebuild:  # 不含重建误差
+            loss, acc = do_train(model, device, graph_dataloader["train"], optimizer, criterion)
+            val_loss, val_acc = do_test(model, device, graph_dataloader["valid"], criterion)
+        else:  # 包含重建误差
+            loss, acc = do_train_and_rebuild(model, device, graph_dataloader["train"], optimizer, criterion)
+            val_loss, val_acc = do_test_and_rebuild(model, device, graph_dataloader["valid"], criterion)
         history['loss'].append(loss)
         history['acc'].append(acc)
         history['val_loss'].append(val_loss)
