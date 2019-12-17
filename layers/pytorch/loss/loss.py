@@ -38,9 +38,9 @@ class ConstructLoss(nn.Module):
             adj_loop = loop + adj
             target = adj_loop.view(-1).long()
             # 节点权重
-            pos_weight = (z.size()[0]*z.size()[0] - th.sum(target).double()) / th.sum(target).double()
-            # weight = th.from_numpy(np.array((1, pos_weight.item()))).to(adj.device).float()
-            weight = th.from_numpy(np.array((1, pos_weight.item()))).to(adj.device)
+            pos_weight = (z.size()[0]*z.size()[0] - th.sum(target).float()) / th.sum(target).float()
+            weight = th.from_numpy(np.array((1, pos_weight.item()))).to(adj.device).float()
+            # weight = th.from_numpy(np.array((1, pos_weight.item()))).to(adj.device)
             # 图重构损失
             loss += F.cross_entropy(pred, target, weight=weight).item()
         # 图平均重构损失

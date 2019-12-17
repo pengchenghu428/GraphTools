@@ -103,7 +103,8 @@ class GraphDataset(object):
             g.add_edges(edge_sub_min[:, 0], edge_sub_min[:, 1])
             g.ndata['h'] = np.eye(node_length, dtype=int) if node_attrs is None else node_attrs[node - 1]
             data.append(g)
-        y = np.where(graph_labels == -1, 1, 0)[available_graph_idx-1].tolist()
+        y = np.where(graph_labels == -1, 1, 0)[available_graph_idx-1].tolist()  #
+        y = y - np.min(y)  # 类别归一化到0 二分类（0，1） 多分类（0，1，2，...）
         return data, y
 
     # 获取节点特征矩阵维度

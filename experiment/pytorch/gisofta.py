@@ -74,6 +74,7 @@ class GISOFTAClassifier(nn.Module):
         feat = graph.ndata['h'].float()
         for idx, gnn_layer in enumerate(self.gnn_layers):
             feat = gnn_layer(graph, feat)
+            graph.ndata['h'] = feat
             readouts.append(self.pool_layers[idx](graph, feat))
         graphs.append(graph)  # 重构误差使用
 
