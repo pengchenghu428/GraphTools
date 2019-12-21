@@ -24,7 +24,6 @@ from utils.pytorch.process import *
 from utils.pytorch.fprint import *
 
 
-
 # 封装训练过程
 def do_train(model, device, train_loader, optimizer, criterion):
     '''

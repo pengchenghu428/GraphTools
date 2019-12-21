@@ -10,7 +10,7 @@
 
 import pandas as pd
 import numpy as np
-import torch
+from tqdm import tqdm
 import dgl
 import os
 
@@ -36,7 +36,7 @@ class GraphDataset(object):
 
         # 划分多张图数据
         data, target = self.split_multi_graph(graph_idx, edges, graph_labels,
-                                                        node_attrs, available_graph_idx)
+                                              node_attrs, available_graph_idx)
         self.data, self.target = data, target
 
     def __len__(self):
@@ -74,12 +74,13 @@ class GraphDataset(object):
         if os.path.exists(node_attrs_path):  # 是否存在节点属性文件
             node_attrs = pd.read_csv(node_attrs_path, header=None).values
         else:  # 节点无属性，则用单位矩阵替换
-            nodes_attrs = None
+            node_attrs = None
 
         return graph_idx, edges, graph_labels, node_attrs
 
     # 拆分多张图
-    def split_multi_graph(self, graph_idx, edges, graph_labels, node_attrs, available_graph_idx):
+    def split_multi_graph(self, graph_idx, edges, graph_labels,
+                          node_attrs, available_graph_idx):
         '''
         将原始大图划分成各个子图
         :param graph_idx: graph 的索引
@@ -91,7 +92,8 @@ class GraphDataset(object):
         data = list()
         node_idx = np.arange(1, graph_idx.shape[0] + 1)
         available_graph_idx = np.unique(graph_idx) if available_graph_idx is None else available_graph_idx
-        for gidx in available_graph_idx:
+        max_node_length = pd.Series(graph_idx).value_counts().iloc[0]
+        for gidx in tqdm(available_graph_idx):
             node = node_idx[graph_idx == gidx]  # 切分出节点编号
             node_length = node.shape[0]  # 节点数量
             mask = np.isin(edges, node).all(axis=1)  # 切分出对应的连接
@@ -101,18 +103,20 @@ class GraphDataset(object):
             g = dgl.DGLGraph()
             g.add_nodes(node_length)
             g.add_edges(edge_sub_min[:, 0], edge_sub_min[:, 1])
-            g.ndata['h'] = np.eye(node_length, dtype=int) if node_attrs is None else node_attrs[node - 1]
+            g.ndata['h'] = np.eye(N=node_length, M=max_node_length, dtype=int) if node_attrs is None else node_attrs[node - 1]
             data.append(g)
-        y = np.where(graph_labels == -1, 1, 0)[available_graph_idx-1].tolist()  #
+        y = graph_labels[available_graph_idx-1]
+        y[y == -1] = 0
         y = y - np.min(y)  # 类别归一化到0 二分类（0，1） 多分类（0，1，2，...）
-        return data, y
+        return data, y.tolist()
 
     # 获取节点特征矩阵维度
     def get_feature_size(self):
         return self.data[0].ndata['h'].size()[-1]
 
+
 if __name__ == "__main__":
     # execute only if run as a script
     os.chdir('../../')
-    graph_dataset = GraphDataset('data/', 'FRANKENSTEIN')
+    graph_dataset = GraphDataset('data/', 'NCI109')
     print(graph_dataset)

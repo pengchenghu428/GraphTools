@@ -28,6 +28,7 @@ from layers.pytorch import *
 warnings.filterwarnings('ignore')
 warnings.filterwarnings(action='ignore', category=UserWarning)
 os.chdir('../../')
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # 让torch判断是否使用GPU
 
 
