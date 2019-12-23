@@ -25,6 +25,7 @@ from layers.pytorch import *
 warnings.filterwarnings('ignore')
 warnings.filterwarnings(action='ignore', category=UserWarning)
 os.chdir('../../')
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # 让torch判断是否使用GPU
 
 
@@ -110,18 +111,20 @@ def build_model(in_feats, n_output=2,n_hidden=[256, 256, 256], n_valid_node=30, 
 
 
 # 数据加载
-def load_data(root_path, name):
-    return GraphDataset(root_path, name, type='')
+def load_data(root_path, name, type='', node_attr_type=0):
+    return GraphDataset(root_path, name, type=type, node_attr_type=node_attr_type)
 
 
 # 实验
 def main():
     # 加载数据
-    graph_dataset = load_data(config.dataset_dir, config.dataset_name)
-    model_name = "{}ep_{}es_{:.5f}lr_{}hi_{:.2f}dp_{}pt_{}fd_{}nv_{}nc".format(config.epoch, config.es_patience,
-                                                                     config.lr, config.n_hidden,
-                                                                     config.dropout, config.pooling_type,
-                                                                     config.n_fold, config.n_valid_node, config.n_channel)
+    graph_dataset = load_data(config.dataset_dir, config.dataset_name, node_attr_type=config.node_attr_type)
+    model_name = "{}bs{}ep_{}es_{:.5f}lr_{}hi_{:.2f}dp_{}pt_{}fd_{}nv_{}nc_{}nat".format(config.batch_size,
+                                                                                          config.epoch, config.es_patience,
+                                                                                          config.lr, config.n_hidden,
+                                                                                          config.dropout, config.pooling_type,
+                                                                                          config.n_fold, config.n_valid_node, config.n_channel,
+                                                                                          config.node_attr_type)
 
     # 构建参数模型
     def build_param_model():

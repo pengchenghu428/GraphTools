@@ -9,7 +9,6 @@
 =================================================='''
 
 import os
-import pickle
 import warnings
 import numpy as np
 import torch as th
@@ -18,10 +17,6 @@ import torch.optim as opt
 import torch.nn.functional as F
 import config.read_gi_softa_config as config
 
-from collections import defaultdict
-from sklearn.model_selection import StratifiedKFold
-from torch.utils.data import DataLoader
-from dgl.data import Subset
 from utils.pytorch import *
 from layers.pytorch import *
 
@@ -120,18 +115,20 @@ def build_model(in_feats, n_output=2,n_hidden=[256, 256, 256], n_head=16, n_chan
 
 
 # 数据加载
-def load_data(root_path, name):
-    return GraphDataset(root_path, name, type='')
+def load_data(root_path, name, type='', node_attr_type=0):
+    return GraphDataset(root_path, name, type=type, node_attr_type=node_attr_type)
 
 
 # 实验
 def main():
     # 加载数据
-    graph_dataset = load_data(config.dataset_dir, config.dataset_name)
-    model_name = "{}ep_{}es_{:.5f}lr_{}hi_{:.2f}dp_{}pt_{}fd_{}nh_{}nc".format(config.epoch, config.es_patience,
-                                                                     config.lr, config.n_hidden,
-                                                                     config.dropout, config.pooling_type,
-                                                                     config.n_fold,config.n_head, config.n_channel)
+    graph_dataset = load_data(config.dataset_dir, config.dataset_name, node_attr_type=config.node_attr_type)
+    model_name = "{}bs_{}ep_{}es_{:.5f}lr_{}hi_{:.2f}dp_{}pt_{}fd_{}nh_{}nc_{}nat".format(config.batch_size,
+                                                                                          config.epoch, config.es_patience,
+                                                                                          config.lr, config.n_hidden,
+                                                                                          config.dropout, config.pooling_type,
+                                                                                          config.n_fold,config.n_head, config.n_channel,
+                                                                                          config.node_attr_type)
 
     # 构建参数模型
     def build_gisofta_model():

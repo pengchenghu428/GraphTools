@@ -8,6 +8,7 @@
 @Desc   ：训练中的函数调用
 =================================================='''
 
+import random
 import pickle
 import torch as th
 import numpy as np
@@ -22,6 +23,15 @@ from utils.pytorch.file import *
 from utils.pytorch.metrics import *
 from utils.pytorch.process import *
 from utils.pytorch.fprint import *
+
+
+# 设定随机种子
+def init_random_seed(seed=42):
+    th.manual_seed(seed)  # cpu
+    th.cuda.manual_seed(seed)  # gpu
+    np.random.seed(seed)  # numpy
+    random.seed(7)  # random and transforms
+    th.backends.cudnn.deterministic = True
 
 
 # 封装训练过程
@@ -180,7 +190,9 @@ def k_fold_train(dataset, model_fn, n_fold,
                  rebuild=False):
     print("start train {}_fold with {}".format(n_fold, model_name))
 
-    sfolder = StratifiedKFold(n_splits=n_fold, random_state=random_seed, shuffle=True)
+    init_random_seed(seed=random_seed)  # 初始化随机种子，保证训练一致
+
+    sfolder = StratifiedKFold(n_splits=n_fold, random_state=random_seed, shuffle=True)  # 分层采样
     X_idx = range(len(dataset))
     y = dataset.target
 
@@ -188,7 +200,6 @@ def k_fold_train(dataset, model_fn, n_fold,
     fold_idx = 0
     for train_idx, val_idx in sfolder.split(X_idx, y):
         fold_idx += 1
-
         model, optimizer, criterion = model_fn()
 
         print("n_Fold:{}/{}".format(fold_idx, n_fold))
@@ -198,7 +209,7 @@ def k_fold_train(dataset, model_fn, n_fold,
         graph_dataset = {"train": train_dataset, "valid": val_dataset}
         graph_dataloader = {x: DataLoader(graph_dataset[x],
                                           batch_size=batch_size,
-                                          shuffle=False,
+                                          shuffle=True,
                                           num_workers=0,
                                           collate_fn=collate) for x in dataset_names}
 
