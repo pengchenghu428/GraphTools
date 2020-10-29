@@ -203,6 +203,7 @@ def k_fold_train(dataset, model_fn, n_fold,
         model, optimizer, criterion = model_fn()
 
         print("n_Fold:{}/{}".format(fold_idx, n_fold))
+        # if fold_idx < 9: continue
         # 数据划分
         train_dataset, val_dataset = Subset(dataset, train_idx), Subset(dataset, val_idx)
         dataset_names = ["train", "valid"]

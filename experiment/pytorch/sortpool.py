@@ -119,7 +119,7 @@ def load_data(root_path, name, type='', node_attr_type=0):
 def main():
     # 加载数据
     graph_dataset = load_data(config.dataset_dir, config.dataset_name, node_attr_type=config.node_attr_type)
-    model_name = "{}bs{}ep_{}es_{:.5f}lr_{}hi_{:.2f}dp_{}pt_{}fd_{}nv_{}nc_{}nat".format(config.batch_size,
+    model_name = "{}bs_{}ep_{}es_{:.5f}lr_{}hi_{:.2f}dp_{}pt_{}fd_{}nv_{}nc_{}nat".format(config.batch_size,
                                                                                           config.epoch, config.es_patience,
                                                                                           config.lr, config.n_hidden,
                                                                                           config.dropout, config.pooling_type,

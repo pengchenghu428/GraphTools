@@ -17,11 +17,7 @@ import torch.optim as opt
 import torch.nn.functional as F
 import config.read_gcn_config as config
 
-from collections import defaultdict
-from sklearn.model_selection import StratifiedKFold
-from torch.utils.data import DataLoader
-from dgl.nn.pytorch import GraphConv, SumPooling, MaxPooling
-from dgl.data import Subset
+from dgl.nn.pytorch import GraphConv
 from utils.pytorch import *
 from layers.pytorch import *
 

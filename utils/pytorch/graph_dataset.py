@@ -81,7 +81,7 @@ class GraphDataset(object):
         edges = pd.read_csv(edges_path, header=None).values.astype('int')
         graph_labels = pd.read_csv(graph_labels_path, header=None).values.flatten().astype('int')
 
-        node_labels = pd.read_csv(node_labels_path, header=None).values if os.path.exists(node_labels_path) else None
+        node_labels = pd.read_csv(node_labels_path, header=None).values[:, -1] if os.path.exists(node_labels_path) else None
         node_attrs = pd.read_csv(node_attrs_path, header=None).values if os.path.exists(node_attrs_path) else None
 
         return graph_idx, edges, graph_labels, node_attrs, node_labels
@@ -103,17 +103,20 @@ class GraphDataset(object):
         max_node_length = pd.Series(graph_idx).value_counts().iloc[0]  # Graph 最大节点数目
 
         # One-Hot node_label
-        if node_attrs is None:
-            if self.node_attr_type == 0 and not(node_labels is None):
-                onehot_encoder = OneHotEncoder(ategories='auto').fit(node_labels.reshape(-1, 1))
-                node_labels = onehot_encoder.transform(node_labels.reshape(-1, 1)).toarray() if not node_labels is None else None
+        if not node_labels is None:
+            onehot_encoder = OneHotEncoder(categories='auto').fit(node_labels.reshape(-1, 1))
+            node_labels = onehot_encoder.transform(node_labels.reshape(-1, 1)).toarray() if not node_labels is None else None
+
+        # 连接node_label和node_attrs
+        if not node_attrs is None and not node_labels is None:
+            node_attrs = np.concatenate([node_attrs, node_labels], axis=1)
 
         for gidx in tqdm(available_graph_idx):
             node = node_idx[graph_idx == gidx]  # 切分出节点编号
             node_length = node.shape[0]  # 节点数量
             mask = np.isin(edges, node).all(axis=1)  # 切分出对应的连接
             edge = edges[mask]
-            edge_sub_min = edge - np.min(edge)  # 从0开始编号
+            edge_sub_min = edge - np.min(edge) if not len(edge)==0 else edge
             # 生成 DGLGraph
             g = dgl.DGLGraph()
             g.add_nodes(node_length)
@@ -122,12 +125,15 @@ class GraphDataset(object):
             if node_attrs is None:  # 无节点特征信息
                 if self.node_attr_type == 1:  # 采用单位矩阵
                     g.ndata['h'] = np.eye(N=node_length, M=max_node_length, dtype=int)
-                else:  # 采用度矩阵和节点特征
+                else: # 采用度矩阵和节点特征
                     degree = g.in_degrees().numpy().reshape(-1, 1)
                     node_label_one_hot = node_labels[node-1]
                     g.ndata['h'] = np.concatenate((node_label_one_hot, degree), axis=1)
             else:  # 存在节点特征信息
-                g.ndata['h'] = node_attrs[node - 1]
+                # g.ndata['h'] = node_attrs[node - 1]
+                degree = g.in_degrees().numpy().reshape(-1, 1)
+                node_attr = node_attrs[node - 1]
+                g.ndata['h'] = np.concatenate((node_attr, degree), axis=1)
             data.append(g)
         y = graph_labels[available_graph_idx-1]
         y[y == -1] = 0
@@ -142,5 +148,5 @@ class GraphDataset(object):
 if __name__ == "__main__":
     # execute only if run as a script
     os.chdir('../../')
-    graph_dataset = GraphDataset('data/', 'NCI109', node_attr_type=0)
+    graph_dataset = GraphDataset('data/', 'NCI1', node_attr_type=0)
     print(graph_dataset)

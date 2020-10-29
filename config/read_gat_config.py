@@ -23,7 +23,7 @@ conf.read(config_path, encoding="utf-8-sig")
 # 数据集参数
 dataset_dir = conf.get('dataset', 'dataset_dir')  # 数据集位置
 dataset_name = conf.get('dataset', 'dataset_name')  # 数据集名字
-node_attr_type = conf.get('dataset', 'node_attr_type')  # 节点特征类型
+node_attr_type = int(conf.get('dataset', 'node_attr_type'))  # 节点特征类型
 
 # 训练参数
 random_seeds = conf.get('train', 'random_seeds').strip().split(',')  # 随机种子设定
