@@ -1,0 +1,7 @@
+precise_score: 0.804469
+recall_score: 0.699029
+accuracy_score: 0.763990
+F1_score: 0.748052
+roc_auc_score: 0.811378
+confusion_matrix: [[170  35]
+ [ 62 144]]

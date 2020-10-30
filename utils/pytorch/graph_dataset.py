@@ -11,6 +11,7 @@
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
+import torch as th
 import dgl
 import os
 
@@ -26,7 +27,8 @@ class GraphDataset(object):
                  name="FRANKENSTEIN",
                  available_graph_idx=None,
                  type="Train",
-                 node_attr_type=0):
+                 node_attr_type=0,
+                 device=None):
         '''
         实现初始化方法，在初始化的时候将数据载入
         :param srcpath: 数据集文件夹位置
@@ -38,6 +40,7 @@ class GraphDataset(object):
         '''
         print('Loading {} {} dataset...'.format(name, type))
         self.node_attr_type = node_attr_type
+        self.device = device
 
         # 从磁盘读取数据
         graph_idx, edges, graph_labels, node_attrs, node_labels = self.read_from_disk(srcpath, name)
@@ -121,19 +124,22 @@ class GraphDataset(object):
             g = dgl.DGLGraph()
             g.add_nodes(node_length)
             g.add_edges(edge_sub_min[:, 0], edge_sub_min[:, 1])
+            g = dgl.add_self_loop(g)  # 添加节点自循环
             # 节点特征
             if node_attrs is None:  # 无节点特征信息
                 if self.node_attr_type == 1:  # 采用单位矩阵
-                    g.ndata['h'] = np.eye(N=node_length, M=max_node_length, dtype=int)
+                    g.ndata['h'] = np.eye(N=node_length, M=max_node_length, dtype=int)  # 节点特征矩阵
                 else: # 采用度矩阵和节点特征
                     degree = g.in_degrees().numpy().reshape(-1, 1)
                     node_label_one_hot = node_labels[node-1]
-                    g.ndata['h'] = np.concatenate((node_label_one_hot, degree), axis=1)
+                    g.ndata['h'] = th.from_numpy(np.concatenate((node_label_one_hot, degree), axis=1))
             else:  # 存在节点特征信息
                 # g.ndata['h'] = node_attrs[node - 1]
                 degree = g.in_degrees().numpy().reshape(-1, 1)
                 node_attr = node_attrs[node - 1]
-                g.ndata['h'] = np.concatenate((node_attr, degree), axis=1)
+                g.ndata['h'] = th.from_numpy(np.concatenate((node_attr, degree), axis=1))
+            if self.device:
+                g = g.to(self.device)
             data.append(g)
         y = graph_labels[available_graph_idx-1]
         y[y == -1] = 0

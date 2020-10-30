@@ -22,9 +22,9 @@ def collate(samples, device=torch.device('cuda')):
     :param device: 训练位置
     :return:
     '''
-    if not device is None:
-        for idx in range(len(samples)):  # 送进GPU中
-            samples[idx][0].to(device)
+
+    # for idx in range(len(samples)):  # 送进GPU中
+    #     samples[idx][0] = samples[idx][0].to(device)
 
     graphs, labels = map(list, zip(*samples))
     batched_graph = dgl.batch(graphs)

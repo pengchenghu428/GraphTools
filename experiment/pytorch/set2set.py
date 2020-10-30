@@ -25,7 +25,7 @@ from layers.pytorch import *
 warnings.filterwarnings('ignore')
 warnings.filterwarnings(action='ignore', category=UserWarning)
 os.chdir('../../')
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # 让torch判断是否使用GPU
 
 
@@ -105,14 +105,14 @@ def build_model(in_feats, n_output=2,n_hidden=[256, 256, 256], n_step=10, n_laye
 
 
 # 数据加载
-def load_data(root_path, name, type='', node_attr_type=0):
-    return GraphDataset(root_path, name, type=type, node_attr_type=node_attr_type)
+def load_data(root_path, name, type='', node_attr_type=0, device=None):
+    return GraphDataset(root_path, name, type=type, node_attr_type=node_attr_type, device=device)
 
 
 # 实验
 def main():
     # 加载数据
-    graph_dataset = load_data(config.dataset_dir, config.dataset_name, node_attr_type=config.node_attr_type)
+    graph_dataset = load_data(config.dataset_dir, config.dataset_name, node_attr_type=config.node_attr_type, device=DEVICE)
     model_name = "{}bs_{}ep_{}es_{:.5f}lr_{}hi_{:.2f}dp_{}pt_{}fd_{}ns_{}nl_{}nat".format(config.batch_size,
                                                                                           config.epoch, config.es_patience,
                                                                                           config.lr, config.n_hidden,

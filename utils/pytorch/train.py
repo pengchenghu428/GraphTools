@@ -208,11 +208,11 @@ def k_fold_train(dataset, model_fn, n_fold,
         train_dataset, val_dataset = Subset(dataset, train_idx), Subset(dataset, val_idx)
         dataset_names = ["train", "valid"]
         graph_dataset = {"train": train_dataset, "valid": val_dataset}
+
         graph_dataloader = {x: DataLoader(graph_dataset[x],
-                                          batch_size=batch_size,
-                                          shuffle=True,
-                                          num_workers=0,
-                                          collate_fn=collate) for x in dataset_names}
+                            batch_size=batch_size, shuffle=True, num_workers=0,
+                            collate_fn=collate
+                            ) for x in dataset_names}
 
         # 训练过程
         train_model(graph_dataloader, random_seed=random_seed, model=model,
